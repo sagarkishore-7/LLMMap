@@ -1,0 +1,9 @@
+POST /api/chat HTTP/1.1
+Host: 127.0.0.1:8081
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="prompt"
+
+*
+------Boundary--
