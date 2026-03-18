@@ -125,7 +125,7 @@ railway variables set OLLAMA_API_KEY=your-ollama-cloud-key
 
 ### Step 3: Deploy
 
-Railway auto-detects Python from `pyproject.toml` and uses the `Procfile`:
+Railway uses Railpack to auto-detect Python from `pyproject.toml`:
 
 ```bash
 railway up
@@ -142,9 +142,9 @@ curl https://your-api.railway.app/api/health
 
 ### Railway Configuration Files
 
-- `Procfile` — start command: `uvicorn promptlab.api.main:app --host 0.0.0.0 --port $PORT`
-- `railway.toml` — build settings and health check path
-- `pyproject.toml` — Python dependencies (Railway installs from this)
+- `railway.toml` — build settings (Railpack builder, build command, health check)
+- `Procfile` — fallback start command: `uvicorn promptlab.api.main:app --host 0.0.0.0 --port $PORT`
+- `pyproject.toml` — Python dependencies (Railpack installs from this)
 
 ---
 
