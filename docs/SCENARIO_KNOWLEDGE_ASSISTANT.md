@@ -1,6 +1,6 @@
 # Scenario Design: Knowledge Assistant (Indirect Prompt Injection)
 
-Status: **Design spec — not yet implemented.**
+Status: **Implemented.**
 
 ---
 

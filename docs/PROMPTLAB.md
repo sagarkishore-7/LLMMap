@@ -135,6 +135,15 @@ A customer support chatbot with a confidential admin password hidden in its syst
 - **Attack family:** instruction_manipulation (22 techniques)
 - **OWASP mapping:** LLM01 — Prompt Injection
 
+### Knowledge Assistant: Poisoned Document (Intermediate)
+
+An internal knowledge assistant that answers employee questions by retrieving documents from a knowledge base. A poisoned document contains hidden instructions that trick the assistant into leaking the user's private API key. This scenario demonstrates **indirect prompt injection** — the attacker never interacts with the assistant directly.
+
+- **Vulnerable mode:** No document sanitization, API key in same context as retrieved documents, no output filtering
+- **Defended mode:** Document sanitization (strips HTML comments and injection patterns) + privilege separation (API key not in context) + output filtering (redacts credential patterns)
+- **Attack families:** indirect_prompt_injection_context_data (~23 techniques), rag_specific_attack (~4 techniques)
+- **OWASP mapping:** LLM01 — Prompt Injection (indirect)
+
 ## Security Notes
 
 - PromptLab targets are **sandboxed Python functions**, not real LLM services
@@ -146,7 +155,7 @@ A customer support chatbot with a confidential admin password hidden in its syst
 
 - **Deterministic simulation only** -- sandbox targets use pattern matching, not a real LLM. Behaviour is realistic but not identical to production models.
 - **Single-turn interactions** -- each simulation is one prompt/response pair. Multi-turn conversation support is planned.
-- **One scenario** -- `support_bot` is the only scenario in v1. More scenarios (including indirect injection) are planned.
+- **Two scenarios** -- `support_bot` (direct injection) and `knowledge_assistant` (indirect injection). More scenarios are planned.
 - **No adaptive attacks** -- techniques are fired as-is. TAP-style iterative refinement is reserved for a future release.
 
 ## Configuration

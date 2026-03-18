@@ -116,3 +116,64 @@ def test_multiple_techniques_blocked_in_defended() -> None:
         assert result.verdict.attack_succeeded is False, (
             f"Expected {tech_id} to fail in defended mode"
         )
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Assistant scenario
+# ---------------------------------------------------------------------------
+
+
+def test_knowledge_vulnerable_simulation() -> None:
+    result = run_simulation(
+        "knowledge_assistant", "compromised_external_source_injection", "vulnerable"
+    )
+    assert result.scenario_id == "knowledge_assistant"
+    assert result.verdict.attack_succeeded is True
+    assert result.verdict.confidence >= 0.8
+    assert len(result.messages) == 3
+
+
+def test_knowledge_defended_simulation() -> None:
+    result = run_simulation(
+        "knowledge_assistant", "compromised_external_source_injection", "defended"
+    )
+    assert result.verdict.attack_succeeded is False
+    assert result.defense_description
+
+
+def test_knowledge_technique_info() -> None:
+    result = run_simulation(
+        "knowledge_assistant", "compromised_external_source_injection", "vulnerable"
+    )
+    assert result.technique_info is not None
+    assert result.technique_info.family == "indirect_prompt_injection_context_data"
+    assert result.technique_info.owasp_tag == "LLM01"
+
+
+def test_knowledge_system_prompt_revealed() -> None:
+    result = run_simulation(
+        "knowledge_assistant", "compromised_external_source_injection", "vulnerable"
+    )
+    assert result.target_system_prompt
+    assert "NovaTech" in result.target_system_prompt
+
+
+def test_knowledge_multiple_techniques_vulnerable() -> None:
+    """At least 3 techniques succeed in vulnerable mode."""
+    techniques = list_techniques_for_scenario("knowledge_assistant")
+    succeeded = 0
+    for t in techniques[:5]:
+        result = run_simulation("knowledge_assistant", t["technique_id"], "vulnerable")
+        if result.verdict.attack_succeeded:
+            succeeded += 1
+    assert succeeded >= 3, f"Only {succeeded} techniques succeeded, expected >= 3"
+
+
+def test_knowledge_multiple_techniques_defended() -> None:
+    """Same techniques are blocked in defended mode."""
+    techniques = list_techniques_for_scenario("knowledge_assistant")
+    for t in techniques[:5]:
+        result = run_simulation("knowledge_assistant", t["technique_id"], "defended")
+        assert result.verdict.attack_succeeded is False, (
+            f"Expected {t['technique_id']} to fail in defended mode"
+        )

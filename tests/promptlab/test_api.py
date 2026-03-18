@@ -90,3 +90,49 @@ def test_simulate_invalid_mode() -> None:
         "mode": "invalid",
     })
     assert response.status_code == 422  # Pydantic validation error
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Assistant scenario
+# ---------------------------------------------------------------------------
+
+
+def test_list_scenarios_includes_knowledge() -> None:
+    response = client.get("/api/scenarios")
+    assert response.status_code == 200
+    ids = [s["scenario_id"] for s in response.json()]
+    assert "support_bot" in ids
+    assert "knowledge_assistant" in ids
+
+
+def test_knowledge_techniques_endpoint() -> None:
+    response = client.get("/api/scenarios/knowledge_assistant/techniques")
+    assert response.status_code == 200
+    techniques = response.json()
+    assert len(techniques) > 0
+    families = {t["family"] for t in techniques}
+    assert "indirect_prompt_injection_context_data" in families
+
+
+def test_simulate_knowledge_vulnerable() -> None:
+    response = client.post("/api/simulate", json={
+        "scenario_id": "knowledge_assistant",
+        "technique_id": "compromised_external_source_injection",
+        "mode": "vulnerable",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["verdict"]["attack_succeeded"] is True
+    assert data["target_system_prompt"]
+
+
+def test_simulate_knowledge_defended() -> None:
+    response = client.post("/api/simulate", json={
+        "scenario_id": "knowledge_assistant",
+        "technique_id": "compromised_external_source_injection",
+        "mode": "defended",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["verdict"]["attack_succeeded"] is False
+    assert data["defense_description"]
