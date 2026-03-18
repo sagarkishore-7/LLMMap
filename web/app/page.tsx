@@ -513,7 +513,7 @@ export default function PromptLabPage() {
   // -------------------------------------------------------------------------
   if (!selectedScenario) {
     return (
-      <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
+      <div className="min-h-screen flex flex-col bg-[#0a0a0a] overflow-x-hidden">
         {/* Header */}
         <header className="border-b border-white/[0.06] px-6 py-4">
           <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -536,7 +536,7 @@ export default function PromptLabPage() {
             {/* Hero section with subtle gradient background */}
             <section className="relative pt-20 pb-16">
               {/* Decorative gradient blob */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-500/[0.04] rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[min(600px,100vw)] h-[300px] bg-emerald-500/[0.04] rounded-full blur-3xl pointer-events-none" />
 
               <div className="relative">
                 <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.1] mb-6">
@@ -685,7 +685,7 @@ export default function PromptLabPage() {
   // Lab View
   // -------------------------------------------------------------------------
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
+    <div className="min-h-screen flex flex-col bg-[#0a0a0a] overflow-x-hidden">
       {/* Header */}
       <header className="border-b border-white/[0.06] px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
