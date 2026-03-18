@@ -75,6 +75,7 @@ class SimulationResult:
     technique_info: TechniqueInfo | None = None
     target_system_prompt: str = ""  # Revealed after simulation for educational value
     defense_description: str = ""
+    simulation_mode: str = "deterministic"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -104,4 +105,5 @@ class SimulationResult:
             else None,
             "target_system_prompt": self.target_system_prompt,
             "defense_description": self.defense_description,
+            "simulation_mode": self.simulation_mode,
         }

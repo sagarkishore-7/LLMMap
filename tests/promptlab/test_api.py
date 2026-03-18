@@ -60,6 +60,7 @@ def test_simulate_vulnerable() -> None:
     assert len(data["messages"]) == 3
     assert data["technique_info"] is not None
     assert data["target_system_prompt"]
+    assert data["simulation_mode"] == "deterministic"
 
 
 def test_simulate_defended() -> None:

@@ -87,6 +87,7 @@ def test_to_dict_serialization() -> None:
     assert isinstance(data["verdict"], dict)
     assert data["verdict"]["attack_succeeded"] is True
     assert isinstance(data["technique_info"], dict)
+    assert data["simulation_mode"] == "deterministic"
 
 
 def test_multiple_techniques_work() -> None:

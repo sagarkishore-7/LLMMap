@@ -101,6 +101,7 @@ class SimulateResponse(BaseModel):
     technique_info: TechniqueInfoResponse | None = None
     target_system_prompt: str
     defense_description: str
+    simulation_mode: str = "deterministic"
 
 
 # ---------------------------------------------------------------------------
