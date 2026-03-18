@@ -70,6 +70,7 @@ const API_BASE =
 
 async function fetchScenarios(): Promise<Scenario[]> {
   const res = await fetch(`${API_BASE}/api/scenarios`);
+  if (!res.ok) throw new Error(`API returned ${res.status}`);
   return res.json();
 }
 
@@ -77,6 +78,7 @@ async function fetchTechniques(scenarioId: string): Promise<Technique[]> {
   const res = await fetch(
     `${API_BASE}/api/scenarios/${scenarioId}/techniques`
   );
+  if (!res.ok) throw new Error(`API returned ${res.status}`);
   return res.json();
 }
 
