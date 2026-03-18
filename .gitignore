@@ -19,3 +19,8 @@ build/
 request
 request[0-9]*
 *.log
+web/node_modules/
+web/.next/
+web/out/
+web/.env
+web/.env.local

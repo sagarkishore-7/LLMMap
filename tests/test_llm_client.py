@@ -44,7 +44,10 @@ class TestOllamaAdapter:
             user_message="usr",
             temperature=0.5,
         )
-        assert url == "http://127.0.0.1:11434/api/chat"
+        # Default URL comes from OLLAMA_BASE_URL env var (or Ollama Cloud)
+        import os
+        expected_base = os.environ.get("OLLAMA_BASE_URL", "https://api.ollama.com")
+        assert url == f"{expected_base}/api/chat"
         data = json.loads(body)
         assert data["model"] == "dolphin3:8b"
         assert data["stream"] is False

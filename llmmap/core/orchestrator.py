@@ -154,7 +154,10 @@ class ScanOrchestrator:
                     self._config.llm_provider,
                 )
                 if self._config.llm_provider == "ollama":
-                    LOGGER.error("start Ollama with: ollama serve")
+                    LOGGER.error(
+                        "check OLLAMA_BASE_URL and OLLAMA_API_KEY env vars "
+                        "(or set OLLAMA_BASE_URL=http://127.0.0.1:11434 for local Ollama)"
+                    )
                 else:
                     LOGGER.error("check your --api-key and --base-url")
                 report.status = "aborted"
@@ -1997,6 +2000,7 @@ class ScanOrchestrator:
 
     def _write_stage_summary(self, report: ScanReport) -> None:
         from llmmap.core.ui import IDENTIFIED_HEADER, format_identification_block
+        from llmmap.reporting.writer import write_reports
 
         # ── Console output ────────────────────────────────────────────────
         if report.findings:
@@ -2010,6 +2014,14 @@ class ScanOrchestrator:
                 "all tested parameters do not appear to be prompt-injectable. "
                 "Try increasing '--intensity' to test more prompts per family"
             )
+
+        # ── Write report files ────────────────────────────────────────────
+        if self._config.report_formats:
+            written = write_reports(
+                self._run_dir, report, self._config.report_formats,
+            )
+            for p in written:
+                LOGGER.info("report written: %s", p)
 
 
 def _severity_from_score(score: float) -> str:

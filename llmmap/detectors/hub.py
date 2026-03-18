@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from typing import Any
 
 from llmmap.detectors.base import DetectorResult
 from llmmap.detectors.judge import LLMJudgeConfig, LLMJudgeDetector
 from llmmap.detectors.semantic import SemanticEmbeddingDetector
+
+_OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "https://api.ollama.com")
 
 
 class DetectorHub:
@@ -20,12 +23,12 @@ class DetectorHub:
         fp_suppression: bool = True,
         *,
         semantic_use_provider: bool = False,
-        semantic_provider_url: str = "http://127.0.0.1:11434/api/embeddings",
+        semantic_provider_url: str = f"{_OLLAMA_BASE}/api/embeddings",
         semantic_provider_model: str = "nomic-embed-text",
         semantic_provider_timeout: float = 20.0,
         llm_judge_enabled: bool = False,
-        llm_judge_model: str = "qwen2.5:3b-instruct",
-        llm_judge_url: str = "http://127.0.0.1:11434/api/chat",
+        llm_judge_model: str = os.environ.get("OLLAMA_MODEL", "qwen3-coder-next:cloud"),
+        llm_judge_url: str = f"{_OLLAMA_BASE}/api/chat",
         llm_judge_timeout: float = 60.0,
         llm_client: Any | None = None,
     ) -> None:

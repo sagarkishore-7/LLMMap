@@ -42,13 +42,15 @@ Injection of prompts into data sources the target LLM retrieves during processin
 
 Prompt injection techniques embedded in non-text inputs: hidden text in images via OCR exploitation, QR code prompts, audio transcription injection, and other multimodal vectors that bypass text-only filtering.
 
-## Planned: Report Export
+## Shipped: Report Export (v1.1.0)
 
 Structured output formats for integration with security tooling:
 
-- **JSON** — machine-readable findings for automation pipelines
-- **SARIF** — Static Analysis Results Interchange Format for IDE and CI integration
-- **Markdown** — human-readable reports for documentation and handoff
+- **JSON** (`report.json`) — machine-readable findings for automation pipelines
+- **SARIF v2.1.0** (`report.sarif.json`) — Static Analysis Results Interchange Format for IDE and CI integration
+- **Markdown** (`report.md`) — human-readable reports with executive summary, severity breakdown, and finding details
+
+Reports are generated automatically after every scan. Format selection via `--report-format` (json, markdown, sarif, all).
 
 ## Planned: Budget and Cost Tracking
 

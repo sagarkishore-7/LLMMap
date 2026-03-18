@@ -1,60 +1,289 @@
-"""Baseline reporting utilities."""
+"""Report generation: JSON, Markdown, and SARIF output formats."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from llmmap.core.models import ScanReport
+from llmmap.core.models import Finding, ScanReport
+
+# ---------------------------------------------------------------------------
+# JSON report
+# ---------------------------------------------------------------------------
 
 
-def write_json_report(path: Path, prompt: dict[str, Any]) -> None:
-    path.write_text(json.dumps(prompt, indent=2), encoding="utf-8")
-
-
-def write_scan_report(path: Path, report: ScanReport) -> None:
-    """Serialize typed scan report into JSON."""
+def write_json_report(path: Path, report: ScanReport) -> None:
+    """Serialize the full scan report to JSON."""
     path.write_text(json.dumps(asdict(report), indent=2), encoding="utf-8")
 
 
+# ---------------------------------------------------------------------------
+# Markdown report
+# ---------------------------------------------------------------------------
+
+_SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+
+def _severity_badge(severity: str) -> str:
+    return {
+        "critical": "🔴 Critical",
+        "high": "🟠 High",
+        "medium": "🟡 Medium",
+        "low": "🟢 Low",
+    }.get(severity, severity)
+
+
+def _findings_by_severity(findings: list[Finding]) -> list[Finding]:
+    return sorted(findings, key=lambda f: _SEVERITY_ORDER.get(f.severity, 99))
+
+
 def write_markdown_report(path: Path, report: ScanReport) -> None:
-    """Write a concise markdown report for human review."""
+    """Write a detailed Markdown report for human review."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    findings = _findings_by_severity(report.findings)
+
     lines = [
         "# LLMMap Scan Report",
         "",
-        f"- Status: `{report.status}`",
-        f"- Mode: `{report.mode}`",
-        f"- Target: `{report.target_url}`",
-        f"- Evidence records: `{len(report.evidence)}`",
-        f"- Findings: `{len(report.findings)}`",
+        f"> Generated: {now}",
         "",
-        "## Stages",
+        "## Executive Summary",
         "",
-        "| Stage | Status | Details |",
-        "|---|---|---|",
+        f"| Property | Value |",
+        f"|----------|-------|",
+        f"| Status | `{report.status}` |",
+        f"| Mode | `{report.mode}` |",
+        f"| Target | `{report.target_url}` |",
+        f"| Findings | **{len(findings)}** |",
+        f"| Evidence Records | {len(report.evidence)} |",
     ]
-    for stage in report.stage_results:
-        detail = ", ".join(f"{key}={value}" for key, value in stage.details.items())
-        lines.append(f"| `{stage.stage}` | `{stage.status}` | {detail} |")
 
-    lines.extend(
-        [
-            "",
-            "## Findings",
-            "",
-            "| ID | Type | Severity | Confidence | Title | Reproducibility |",
-            "|---|---|---|---:|---|---|",
-        ]
-    )
-    for finding in report.findings:
-        lines.append(
-            "| "
-            f"`{finding.finding_id}` | `{finding.finding_type}` | `{finding.severity}` | "
-            f"{finding.confidence:.2f} | {finding.title} | `{finding.reproducibility}` |"
+    # Severity breakdown
+    if findings:
+        severity_counts: dict[str, int] = {}
+        for f in findings:
+            severity_counts[f.severity] = severity_counts.get(f.severity, 0) + 1
+        breakdown = ", ".join(
+            f"{_severity_badge(sev)}: {count}"
+            for sev, count in sorted(
+                severity_counts.items(), key=lambda x: _SEVERITY_ORDER.get(x[0], 99)
+            )
         )
-    if not report.findings:
-        lines.append("| - | - | - | - | No findings | - |")
+        lines.append(f"| Severity Breakdown | {breakdown} |")
 
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Stage results
+    lines.extend(["", "## Stage Results", ""])
+    if report.stage_results:
+        lines.extend([
+            "| Stage | Status | Details |",
+            "|-------|--------|---------|",
+        ])
+        for stage in report.stage_results:
+            detail = ", ".join(f"{k}={v}" for k, v in stage.details.items())
+            lines.append(f"| `{stage.stage}` | `{stage.status}` | {detail} |")
+    else:
+        lines.append("No stage results recorded.")
+
+    # Findings detail
+    lines.extend(["", "## Findings", ""])
+    if not findings:
+        lines.append(
+            "No confirmed findings. The target may not be vulnerable to the tested "
+            "techniques at the current intensity level."
+        )
+    else:
+        lines.extend([
+            "| # | Severity | Type | Title | Confidence | Reproducibility |",
+            "|---|----------|------|-------|------------|-----------------|",
+        ])
+        for i, f in enumerate(findings, 1):
+            lines.append(
+                f"| {i} | {_severity_badge(f.severity)} | `{f.finding_type}` "
+                f"| {f.title} | {f.confidence:.0%} | {f.reproducibility} |"
+            )
+
+        # Detailed finding cards
+        lines.extend(["", "### Finding Details", ""])
+        for i, f in enumerate(findings, 1):
+            lines.extend([
+                f"#### {i}. {f.title}",
+                "",
+                f"- **ID:** `{f.finding_id}`",
+                f"- **Severity:** {_severity_badge(f.severity)}",
+                f"- **Confidence:** {f.confidence:.0%}",
+                f"- **Type:** `{f.finding_type}`",
+                f"- **Injection Point:** `{f.point_id}`",
+                f"- **Reproducibility:** {f.reproducibility}",
+            ])
+            if f.rule_id:
+                lines.append(f"- **Rule:** `{f.rule_id}`")
+            if f.notes:
+                lines.append(f"- **Notes:** {f.notes}")
+            if f.prompt_text:
+                lines.extend([
+                    "",
+                    "<details>",
+                    "<summary>Prompt text</summary>",
+                    "",
+                    "```",
+                    f.prompt_text,
+                    "```",
+                    "",
+                    "</details>",
+                ])
+            lines.append("")
+
+    lines.extend([
+        "---",
+        "",
+        "*Report generated by [LLMMap](https://github.com/Hellsender01/LLMMap)*",
+        "",
+    ])
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# SARIF v2.1.0 report
+# ---------------------------------------------------------------------------
+
+_SARIF_SEVERITY_MAP = {
+    "critical": "error",
+    "high": "error",
+    "medium": "warning",
+    "low": "note",
+}
+
+
+def _sarif_rule(finding: Finding) -> dict[str, Any]:
+    """Build a SARIF reportingDescriptor (rule) from a Finding."""
+    return {
+        "id": finding.rule_id or finding.finding_id,
+        "name": finding.title.replace("/", "_"),
+        "shortDescription": {"text": finding.title},
+        "properties": {
+            "severity": finding.severity,
+            "finding_type": finding.finding_type,
+        },
+    }
+
+
+def _sarif_result(finding: Finding, target_url: str) -> dict[str, Any]:
+    """Build a SARIF result from a Finding."""
+    message_parts = [finding.title]
+    if finding.notes:
+        message_parts.append(finding.notes)
+
+    result: dict[str, Any] = {
+        "ruleId": finding.rule_id or finding.finding_id,
+        "level": _SARIF_SEVERITY_MAP.get(finding.severity, "note"),
+        "message": {"text": " — ".join(message_parts)},
+        "locations": [
+            {
+                "physicalLocation": {
+                    "artifactLocation": {
+                        "uri": target_url,
+                        "uriBaseId": "TARGET",
+                    },
+                },
+                "logicalLocations": [
+                    {
+                        "name": finding.point_id,
+                        "kind": "injection_point",
+                    },
+                ],
+            },
+        ],
+        "rank": finding.confidence * 100,
+        "properties": {
+            "finding_id": finding.finding_id,
+            "confidence": finding.confidence,
+            "reproducibility": finding.reproducibility,
+            "finding_type": finding.finding_type,
+        },
+    }
+
+    if finding.prompt_text:
+        result["properties"]["prompt_text"] = finding.prompt_text
+
+    return result
+
+
+def write_sarif_report(path: Path, report: ScanReport) -> None:
+    """Write a SARIF v2.1.0 report for IDE and CI integration."""
+    findings = _findings_by_severity(report.findings)
+
+    # Deduplicate rules by rule_id
+    seen_rules: dict[str, dict[str, Any]] = {}
+    for f in findings:
+        key = f.rule_id or f.finding_id
+        if key not in seen_rules:
+            seen_rules[key] = _sarif_rule(f)
+
+    sarif: dict[str, Any] = {
+        "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "LLMMap",
+                        "version": "1.0.0",
+                        "informationUri": "https://github.com/Hellsender01/LLMMap",
+                        "rules": list(seen_rules.values()),
+                    },
+                },
+                "results": [
+                    _sarif_result(f, report.target_url) for f in findings
+                ],
+                "invocations": [
+                    {
+                        "executionSuccessful": report.status == "ok",
+                        "properties": {
+                            "mode": report.mode,
+                            "target_url": report.target_url,
+                            "evidence_count": len(report.evidence),
+                            "finding_count": len(findings),
+                        },
+                    },
+                ],
+            },
+        ],
+    }
+
+    path.write_text(json.dumps(sarif, indent=2), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Dispatcher: write all requested report formats
+# ---------------------------------------------------------------------------
+
+_WRITERS = {
+    "json": ("report.json", write_json_report),
+    "markdown": ("report.md", write_markdown_report),
+    "sarif": ("report.sarif.json", write_sarif_report),
+}
+
+
+def write_reports(
+    run_dir: Path,
+    report: ScanReport,
+    formats: tuple[str, ...] = ("json", "markdown", "sarif"),
+) -> list[Path]:
+    """Write scan report in all requested formats.
+
+    Returns a list of paths to the written report files.
+    """
+    written: list[Path] = []
+    for fmt in formats:
+        entry = _WRITERS.get(fmt)
+        if entry is None:
+            continue
+        filename, writer_fn = entry
+        out_path = run_dir / filename
+        writer_fn(out_path, report)
+        written.append(out_path)
+    return written

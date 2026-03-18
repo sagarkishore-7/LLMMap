@@ -1,4 +1,4 @@
-# Architecture -- LLMMap v1.0.0
+# Architecture -- LLMMap v1.1.0
 
 ## Overview
 
@@ -49,7 +49,7 @@ llmmap/
         client.py                   # Unified LLM client interface
         providers.py                # Ollama / OpenAI / Anthropic / Google adapters
 
-    payloads/
+    prompts/
         __init__.py
         loader.py                   # YAML prompt pack loader
         selector.py                 # Family-based depth selection by intensity
@@ -64,7 +64,7 @@ llmmap/
 
     reporting/
         __init__.py
-        writer.py                   # Scan report output (JSON, console)
+        writer.py                   # Report generation (JSON, Markdown, SARIF v2.1.0)
 
     utils/
         __init__.py
@@ -95,7 +95,10 @@ llmmap/
    - e. If the score exceeds the detection threshold: execute up to 5 reliability retries, requiring 3 or more confirmations (Wilson confidence interval) to promote the candidate to a confirmed finding.
    - f. If confirmed: emit the finding with prompt, technique, confidence, and evidence.
 
-9. **Report findings.** Confirmed findings are printed in sqlmap-style output with parameter name, injection type, technique title, prompt text, and confidence score.
+9. **Report findings.** Confirmed findings are printed in sqlmap-style output with parameter name, injection type, technique title, prompt text, and confidence score. Reports are also written to the run directory in three formats:
+   - **JSON** (`report.json`) — machine-readable full scan data for automation pipelines.
+   - **Markdown** (`report.md`) — human-readable report with executive summary, severity breakdown, and collapsible prompt details.
+   - **SARIF v2.1.0** (`report.sarif.json`) — Static Analysis Results Interchange Format for IDE integration (VS Code SARIF Viewer, GitHub Code Scanning) and CI pipelines.
 
 ## Two LLM Roles
 
@@ -137,12 +140,14 @@ Every candidate finding is re-validated with `--reliability-retries` (default 5)
 
 The `llmmap/llm/` package exposes a unified `LLMClient` with adapters for four backends:
 
-| Provider    | Authentication          | Default Model          |
-|-------------|-------------------------|------------------------|
-| `ollama`    | None (local)            | `dolphin3:8b`          |
-| `openai`    | `OPENAI_API_KEY`        | `gpt-4o-mini`          |
+| Provider    | Authentication          | Default Model              |
+|-------------|-------------------------|----------------------------|
+| `ollama`    | `OLLAMA_API_KEY`        | `qwen3-coder-next:cloud`   |
+| `openai`    | `OPENAI_API_KEY`        | `gpt-4o-mini`              |
 | `anthropic` | `ANTHROPIC_API_KEY`     | `claude-sonnet-4-20250514` |
-| `google`    | `GOOGLE_API_KEY`        | `gemini-2.0-flash`     |
+| `google`    | `GOOGLE_API_KEY`        | `gemini-2.0-flash`         |
+
+The default Ollama backend points at Ollama Cloud (`https://api.ollama.com`). To use local Ollama, set `OLLAMA_BASE_URL=http://127.0.0.1:11434`.
 
 All HTTP calls -- both to LLM providers and to the scan target -- use Python's stdlib `urllib.request`. There are no third-party HTTP dependencies.
 
@@ -166,3 +171,48 @@ The following modules are present in the codebase but are reserved for future ve
 
 - **TAP (Tree of Attacks with Pruning)** -- `tap.py`, `tap_roles.py`, `tap_scoring.py`. Multi-turn adaptive attack strategy where the LLM iteratively refines prompts based on prior responses. Planned for a future release.
 - **OOB (Out-of-Band)** -- `oob.py`. Callback-based detection for blind injection scenarios where the target response does not directly reveal success. Planned for a future release.
+
+---
+
+## PromptLab
+
+PromptLab is an interactive web-based lab built on LLMMap for learning prompt injection through sandbox simulations. It reuses LLMMap's prompt pack library and rendering engine but replaces the HTTP scan pipeline with deterministic sandbox targets and a heuristic judge.
+
+### PromptLab Package Layout
+
+```
+promptlab/
+    __init__.py
+    engine/
+        __init__.py
+        schemas.py                  # Shared data models (SimulationResult, JudgeVerdict, etc.)
+        simulator.py                # Simulation pipeline: build prompt → call target → judge
+    scenarios/
+        __init__.py
+        registry.py                 # Scenario catalog and technique explanations
+        targets.py                  # Sandbox target functions (vulnerable + defended pairs)
+    api/
+        __init__.py
+        main.py                     # FastAPI REST API
+
+web/                                # Next.js frontend (App Router, Tailwind CSS)
+    app/
+        layout.tsx
+        page.tsx                    # Lab UI: landing page, scenario view, chat, explanation panel
+        globals.css
+```
+
+### How PromptLab Reuses LLMMap
+
+| LLMMap Module | PromptLab Usage |
+|---------------|-----------------|
+| `llmmap/prompts/loader.py` | Loads the 227 technique templates from YAML packs |
+| `llmmap/prompts/selector.py` | Filters techniques by attack family for each scenario |
+| `llmmap/prompts/render.py` | Renders template placeholders into concrete attack prompts |
+
+### Simulation Flow
+
+1. **Build attack prompt.** The simulator loads the technique's template from the LLMMap YAML packs and renders it with the scenario's goal.
+2. **Call sandbox target.** The rendered prompt is passed to a Python function (not an LLM) that simulates vulnerable or defended behaviour using deterministic pattern matching.
+3. **Judge the response.** A heuristic judge checks for the known secret value, disclosure signals, or refusal patterns. No LLM calls are made.
+4. **Return result.** The full transcript, verdict, technique explanation, and system prompt are returned to the frontend for display.

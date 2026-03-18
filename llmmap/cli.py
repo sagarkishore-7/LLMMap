@@ -336,6 +336,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="scan results directory (default: runs/)",
     )
     output_group.add_argument(
+        "--report-format",
+        action="append",
+        dest="report_formats",
+        default=[],
+        help=(
+            "report output format: json, markdown, sarif, all "
+            "(default: all). Can be specified multiple times"
+        ),
+    )
+    output_group.add_argument(
         "--purge-old-runs",
         action="store_true",
         help="delete previous scan folders",
@@ -375,26 +385,29 @@ def app(argv: Sequence[str] | None = None) -> int:
     import os as _os
 
     _PROVIDER_DEFAULT_MODELS = {
-        "ollama": "dolphin3:8b",
+        "ollama": _os.environ.get("OLLAMA_MODEL", "qwen3-coder-next:cloud"),
         "openai": "gpt-4o-mini",
         "anthropic": "claude-sonnet-4-20250514",
         "google": "gemini-2.0-flash",
     }
     _PROVIDER_ENV_KEYS = {
+        "ollama": "OLLAMA_API_KEY",
         "openai": "OPENAI_API_KEY",
         "anthropic": "ANTHROPIC_API_KEY",
         "google": "GOOGLE_API_KEY",
     }
 
-    resolved_model = args.model or _PROVIDER_DEFAULT_MODELS.get(args.provider, "dolphin3:8b")
+    resolved_model = args.model or _PROVIDER_DEFAULT_MODELS.get(args.provider, "qwen3-coder-next:cloud")
 
-    # API key: CLI flag → environment variable
+    # API key: CLI flag -> environment variable
     resolved_api_key = args.api_key
     if resolved_api_key is None:
         env_var = _PROVIDER_ENV_KEYS.get(args.provider)
         if env_var:
             resolved_api_key = _os.environ.get(env_var)
 
+    # Cloud providers (including Ollama Cloud) require an API key.
+    # Local Ollama (OLLAMA_BASE_URL=http://127.0.0.1:11434) works without one.
     if args.provider in ("openai", "anthropic", "google") and not resolved_api_key:
         env_var = _PROVIDER_ENV_KEYS.get(args.provider, "")
         LOGGER.error(
@@ -417,6 +430,24 @@ def app(argv: Sequence[str] | None = None) -> int:
             for x in args.ignore_code.split(",")
             if x.strip() and x.strip().isdigit()
         )
+
+    # ── Resolve report formats ──────────────────────────────────────────
+    _VALID_REPORT_FORMATS = {"json", "markdown", "sarif"}
+    if args.report_formats:
+        resolved_formats: set[str] = set()
+        for fmt in args.report_formats:
+            for part in fmt.split(","):
+                part = part.strip().lower()
+                if part == "all":
+                    resolved_formats = set(_VALID_REPORT_FORMATS)
+                    break
+                if part in _VALID_REPORT_FORMATS:
+                    resolved_formats.add(part)
+                else:
+                    LOGGER.warning("unknown report format %r (valid: json, markdown, sarif, all)", part)
+        report_formats = tuple(sorted(resolved_formats))
+    else:
+        report_formats = ("json", "markdown", "sarif")
 
     config = RuntimeConfig(
         mode=args.mode,
@@ -478,9 +509,10 @@ def app(argv: Sequence[str] | None = None) -> int:
         llm_provider=args.provider,
         llm_model=resolved_model,
         llm_api_key=resolved_api_key,
-        llm_base_url=args.base_url,
+        llm_base_url=args.base_url or _os.environ.get("OLLAMA_BASE_URL") if args.provider == "ollama" else args.base_url,
         callback_url=args.callback_url,
         data_flow=False,
+        report_formats=report_formats,
     )
 
     # --goal is required for the LLM-driven generation pipeline

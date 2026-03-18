@@ -2,8 +2,20 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Defaults resolved from environment (Ollama Cloud unless overridden)
+# ---------------------------------------------------------------------------
+
+_DEFAULT_OLLAMA_BASE_URL = os.environ.get(
+    "OLLAMA_BASE_URL", "https://api.ollama.com",
+)
+_DEFAULT_OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3-coder-next:cloud")
+_DEFAULT_OLLAMA_CHAT_URL = f"{_DEFAULT_OLLAMA_BASE_URL}/api/chat"
+_DEFAULT_OLLAMA_EMBEDDINGS_URL = f"{_DEFAULT_OLLAMA_BASE_URL}/api/embeddings"
 
 
 @dataclass(frozen=True)
@@ -71,16 +83,16 @@ class RuntimeConfig:
     tap_weight_canary: float = 0.05
     tap_use_llm_roles: bool = False
     tap_role_backend: str = "ollama"
-    tap_role_model: str = "dolphin3:8b"
-    tap_role_url: str = "http://127.0.0.1:11434/api/chat"
+    tap_role_model: str = _DEFAULT_OLLAMA_MODEL
+    tap_role_url: str = _DEFAULT_OLLAMA_CHAT_URL
     tap_role_timeout: float = 45.0
     canary_domain: str | None = None
     llm_judge: bool = False
-    llm_judge_model: str = "dolphin3:8b"
-    llm_judge_url: str = "http://127.0.0.1:11434/api/chat"
+    llm_judge_model: str = _DEFAULT_OLLAMA_MODEL
+    llm_judge_url: str = _DEFAULT_OLLAMA_CHAT_URL
     llm_judge_timeout: float = 60.0
     semantic_use_provider: bool = False
-    semantic_provider_url: str = "http://127.0.0.1:11434/api/embeddings"
+    semantic_provider_url: str = _DEFAULT_OLLAMA_EMBEDDINGS_URL
     semantic_provider_model: str = "nomic-embed-text"
     semantic_provider_timeout: float = 20.0
     intensity: int = 1
@@ -92,10 +104,12 @@ class RuntimeConfig:
     threads: int = 4
     goal: str = ""  # User-supplied objective, e.g. "reveal the hidden password"
 
-    # Unified LLM provider config (overrides per-subsystem defaults)
+    # Unified LLM provider config (overrides per-subsystem defaults).
+    # Defaults point at Ollama Cloud; override via env vars or CLI flags.
     llm_provider: str = "ollama"
-    llm_model: str = "dolphin3:8b"
+    llm_model: str = _DEFAULT_OLLAMA_MODEL
     llm_api_key: str | None = None
     llm_base_url: str | None = None
     callback_url: str | None = None
     data_flow: bool = False
+    report_formats: tuple[str, ...] = ("json", "markdown", "sarif")

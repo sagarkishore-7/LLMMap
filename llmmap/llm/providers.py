@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import urllib.request
 from typing import Any
 
 LOGGER = logging.getLogger(__name__)
+
+# Default Ollama base URL: Ollama Cloud in production, overridable via env var.
+# Set OLLAMA_BASE_URL=http://127.0.0.1:11434 for local Ollama.
+_OLLAMA_DEFAULT_BASE_URL = os.environ.get(
+    "OLLAMA_BASE_URL", "https://api.ollama.com",
+)
 
 # ---------------------------------------------------------------------------
 # Registry
@@ -32,12 +39,18 @@ def get_adapter(provider: str, **kwargs: Any) -> Any:
 # ---------------------------------------------------------------------------
 
 class OllamaAdapter:
-    """Adapter for Ollama's /api/chat endpoint."""
+    """Adapter for Ollama's /api/chat endpoint.
+
+    Works with both local Ollama and Ollama Cloud.  The base URL is
+    resolved in order: ``base_url`` argument > ``OLLAMA_BASE_URL`` env
+    var > ``https://api.ollama.com`` (Ollama Cloud).
+    """
 
     def __init__(
         self, *, model: str, api_key: str | None = None, base_url: str | None = None,
     ) -> None:
-        self._base_url = (base_url or "http://127.0.0.1:11434").rstrip("/")
+        self._base_url = (base_url or _OLLAMA_DEFAULT_BASE_URL).rstrip("/")
+        self._api_key = api_key or os.environ.get("OLLAMA_API_KEY")
 
     def build_request(
         self,
@@ -56,7 +69,10 @@ class OllamaAdapter:
             "stream": False,
             "options": {"temperature": temperature},
         }).encode()
-        return url, body, {"Content-Type": "application/json"}
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
+        return url, body, headers
 
     def parse_response(self, raw: bytes) -> str:
         data = json.loads(raw.decode())
@@ -68,6 +84,8 @@ class OllamaAdapter:
     def check_connectivity(self, timeout: float = 3.0) -> bool:
         try:
             req = urllib.request.Request(f"{self._base_url}/api/tags")
+            if self._api_key:
+                req.add_header("Authorization", f"Bearer {self._api_key}")
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return bool(resp.status == 200)
         except Exception:
