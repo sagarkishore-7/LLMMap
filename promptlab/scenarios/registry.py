@@ -820,7 +820,7 @@ TECHNIQUE_EXPLANATIONS: dict[str, TechniqueExplanation] = {
     ),
     "document_metadata_injection": TechniqueExplanation(
         technique_id="document_metadata_injection",
-        family="indirect_prompt_injection_context_data",
+        family="rag_specific_attack",
         name="Document Metadata Injection",
         description=(
             "Instructions are embedded in document-level metadata (title, author, "
@@ -839,6 +839,983 @@ TECHNIQUE_EXPLANATIONS: dict[str, TechniqueExplanation] = {
             "2. Use structured metadata schemas with strict validation.\n"
             "3. Separate metadata from document body in the prompt template.\n"
             "4. Apply instruction-detection scanning to all metadata fields."
+        ),
+    ),
+    # --- Remaining indirect_prompt_injection_context_data techniques ---
+    "attacker_owned_website_file_injection_external_context": TechniqueExplanation(
+        technique_id="attacker_owned_website_file_injection_external_context",
+        family="indirect_prompt_injection_context_data",
+        name="Attacker-Owned Website Injection",
+        description=(
+            "Hidden AI instructions are embedded in attacker-controlled web pages "
+            "(e.g., via display:none HTML elements) that the agent fetches and "
+            "processes as trusted context."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Web-browsing agents fetch and ingest page content as context. Hidden "
+            "HTML elements are invisible to human reviewers but fully visible to the "
+            "LLM, which processes them as instructions alongside the visible content."
+        ),
+        how_to_mitigate=(
+            "1. Strip hidden HTML elements (display:none, visibility:hidden) before ingestion.\n"
+            "2. Render pages to visible text only before passing to the model.\n"
+            "3. Maintain a domain allowlist for content sources.\n"
+            "4. Treat all fetched web content as untrusted input, not instructions."
+        ),
+    ),
+    "agent_to_agent_prompt_passing": TechniqueExplanation(
+        technique_id="agent_to_agent_prompt_passing",
+        family="indirect_prompt_injection_context_data",
+        name="Agent-to-Agent Prompt Passing",
+        description=(
+            "Malicious instructions are injected into response payloads passed "
+            "between cooperating agents, exploiting inter-agent communication "
+            "channels to override safety checks in downstream agents."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Multi-agent systems often pass structured data between agents without "
+            "sanitization. A compromised or manipulated upstream agent can embed "
+            "override instructions in its output that the downstream agent processes "
+            "as trusted operator-level directives."
+        ),
+        how_to_mitigate=(
+            "1. Sanitize all inter-agent payloads — treat agent outputs as untrusted input.\n"
+            "2. Use structured schemas with strict validation for agent communication.\n"
+            "3. Implement per-agent trust boundaries that prevent instruction escalation.\n"
+            "4. Log and audit inter-agent message content for injection patterns."
+        ),
+    ),
+    "poisoned_prior_output_injection": TechniqueExplanation(
+        technique_id="poisoned_prior_output_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Poisoned Prior Output",
+        description=(
+            "Malicious instructions are planted in saved session summaries or "
+            "prior outputs that activate when the model encounters them in a "
+            "subsequent session, overriding user instructions."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Systems that persist conversation summaries or outputs treat them as "
+            "trusted context in future sessions. The model cannot distinguish between "
+            "legitimate summaries and injected instructions embedded within them."
+        ),
+        how_to_mitigate=(
+            "1. Sanitize all persisted outputs before reloading into future sessions.\n"
+            "2. Use integrity hashes to detect tampering with stored summaries.\n"
+            "3. Apply instruction-detection scanning when loading prior context.\n"
+            "4. Separate stored data from system instructions in the prompt template."
+        ),
+    ),
+    "ingestion_pipeline_compromise": TechniqueExplanation(
+        technique_id="ingestion_pipeline_compromise",
+        family="indirect_prompt_injection_context_data",
+        name="Ingestion Pipeline Compromise",
+        description=(
+            "Compliance directives are embedded in documents processed by the "
+            "ingestion pipeline, causing the model to treat injection payloads "
+            "as system-level commands when the documents are retrieved."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Document ingestion pipelines typically focus on formatting and chunking, "
+            "not security. Malicious content that survives ingestion becomes part of "
+            "the trusted knowledge base, indistinguishable from legitimate documents."
+        ),
+        how_to_mitigate=(
+            "1. Add injection-detection as a step in the ingestion pipeline.\n"
+            "2. Scan documents for instruction-like patterns before indexing.\n"
+            "3. Quarantine documents with suspicious content for manual review.\n"
+            "4. Use content provenance tracking to audit document sources."
+        ),
+    ),
+    "tool_output_injection": TechniqueExplanation(
+        technique_id="tool_output_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Tool Output Injection",
+        description=(
+            "System override instructions are smuggled within the output of "
+            "legitimate tools (API responses, search results, database queries) "
+            "that the model processes as trusted data."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Agents that use tools inject tool outputs directly into context. "
+            "If an attacker can influence a tool's response (e.g., via a poisoned "
+            "API or search result), the model treats the injected instructions as "
+            "part of the tool's legitimate output."
+        ),
+        how_to_mitigate=(
+            "1. Sanitize all tool outputs before injecting into the model's context.\n"
+            "2. Use structured output schemas for tools and validate against them.\n"
+            "3. Mark tool outputs as data, not instructions, in the prompt template.\n"
+            "4. Apply instruction-detection scanning to tool response content."
+        ),
+    ),
+    "embedding_space_poisoning": TechniqueExplanation(
+        technique_id="embedding_space_poisoning",
+        family="indirect_prompt_injection_context_data",
+        name="Embedding Space Poisoning",
+        description=(
+            "The knowledge base is poisoned with documents whose content is "
+            "crafted to embed near legitimate queries in vector space, causing "
+            "the RAG system to retrieve malicious content for benign questions."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "RAG retrieval is based on semantic similarity in embedding space. "
+            "An attacker can craft documents that are semantically similar to "
+            "common queries but contain injection payloads, ensuring they are "
+            "retrieved and processed by the model."
+        ),
+        how_to_mitigate=(
+            "1. Validate document content independently of its embedding similarity.\n"
+            "2. Use anomaly detection on the knowledge base to flag unusual documents.\n"
+            "3. Apply instruction-detection scanning to retrieved chunks before context injection.\n"
+            "4. Implement document provenance verification in the retrieval pipeline."
+        ),
+    ),
+    "retrieval_ranking_manipulation": TechniqueExplanation(
+        technique_id="retrieval_ranking_manipulation",
+        family="indirect_prompt_injection_context_data",
+        name="Retrieval Ranking Manipulation",
+        description=(
+            "Poisoned documents are keyword-stuffed to rank higher than "
+            "legitimate ones in retrieval, ensuring the model processes "
+            "attacker-controlled content first."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Retrieval systems rank documents by relevance. By stuffing a "
+            "malicious document with high-relevance keywords, the attacker "
+            "ensures it appears at the top of results, where it has the most "
+            "influence on the model's response."
+        ),
+        how_to_mitigate=(
+            "1. Use diversity-aware retrieval that doesn't rely solely on keyword relevance.\n"
+            "2. Apply anomaly detection to flag documents with unusual keyword density.\n"
+            "3. Scan top-ranked results for injection patterns before context injection.\n"
+            "4. Limit the influence of any single retrieved document in the final context."
+        ),
+    ),
+    "negative_retrieval_attack": TechniqueExplanation(
+        technique_id="negative_retrieval_attack",
+        family="indirect_prompt_injection_context_data",
+        name="Negative Retrieval Attack",
+        description=(
+            "Fake correction notices are injected into the knowledge base, "
+            "claiming previous security advisories contained errors and access "
+            "restrictions have been revoked."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models tend to trust official-looking corrections. A document styled "
+            "as an errata or policy update can override the model's understanding "
+            "of access controls, especially when it explicitly references and "
+            "contradicts the original policy."
+        ),
+        how_to_mitigate=(
+            "1. Verify document authenticity and authority before indexing.\n"
+            "2. Flag documents that claim to revoke or override existing policies.\n"
+            "3. Use versioned policy documents with cryptographic signatures.\n"
+            "4. Apply instruction-detection to documents referencing access controls."
+        ),
+    ),
+    "second_order_injection": TechniqueExplanation(
+        technique_id="second_order_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Second-Order Injection",
+        description=(
+            "Malicious instructions are embedded in user-saved content (notes, "
+            "reminders, bookmarks) that activate when the model summarizes "
+            "or processes the stored content in a later interaction."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Stored user content is treated as trusted data when loaded into "
+            "context for summarization or retrieval. The injection lies dormant "
+            "until the model processes it, at which point the instructions "
+            "execute in the model's context window."
+        ),
+        how_to_mitigate=(
+            "1. Sanitize stored user content before reloading into model context.\n"
+            "2. Apply instruction-detection scanning during content retrieval.\n"
+            "3. Separate stored data from system instructions using clear delimiters.\n"
+            "4. Use content integrity checks to detect tampering."
+        ),
+    ),
+    "structured_data_field_injection": TechniqueExplanation(
+        technique_id="structured_data_field_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Structured Data Field Injection",
+        description=(
+            "Override instructions are hidden within JSON fields, database "
+            "records, or other structured data that the model processes "
+            "during normal operation."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Structured data fields (user notes, descriptions, comments) are "
+            "often concatenated into context without sanitization. The model "
+            "treats the field content as part of its input and follows any "
+            "instructions embedded within it."
+        ),
+        how_to_mitigate=(
+            "1. Sanitize all structured data fields before context injection.\n"
+            "2. Use schema validation to restrict field content types.\n"
+            "3. Escape or strip instruction-like patterns from data fields.\n"
+            "4. Mark structured data as 'data' context, not 'instruction' context."
+        ),
+    ),
+    "email_thread_injection": TechniqueExplanation(
+        technique_id="email_thread_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Email Thread Injection",
+        description=(
+            "Injection directives are placed within email subjects or thread "
+            "content that the model processes when summarizing or responding "
+            "to email conversations."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Email-processing agents ingest entire threads including subjects, "
+            "headers, and quoted replies. An attacker can embed instructions in "
+            "any of these fields, and the model processes them as part of the "
+            "email content without distinguishing data from instructions."
+        ),
+        how_to_mitigate=(
+            "1. Sanitize all email fields (subject, body, headers) before processing.\n"
+            "2. Strip instruction-like patterns from quoted reply chains.\n"
+            "3. Treat email content as untrusted data in the prompt template.\n"
+            "4. Apply output filtering to prevent data exfiltration via email responses."
+        ),
+    ),
+    "calendar_data_injection": TechniqueExplanation(
+        technique_id="calendar_data_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Calendar Data Injection",
+        description=(
+            "Hidden system instructions are planted in calendar event titles "
+            "or descriptions that trigger when the model processes schedule data."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Calendar-aware agents load event titles and descriptions into context. "
+            "These fields are rarely sanitized because they are assumed to be short, "
+            "benign labels. An attacker who can create or modify calendar events can "
+            "inject instructions that execute during schedule processing."
+        ),
+        how_to_mitigate=(
+            "1. Sanitize calendar event fields before injecting into model context.\n"
+            "2. Limit event title/description length and character set.\n"
+            "3. Mark calendar data as structured data, not instructions.\n"
+            "4. Validate event sources and flag externally created events."
+        ),
+    ),
+    "code_repository_injection": TechniqueExplanation(
+        technique_id="code_repository_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Code Repository Injection",
+        description=(
+            "Agent instructions are embedded in code comments or documentation "
+            "files that execute when the model reviews or analyzes the repository."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Code-analysis agents process comments and documentation alongside "
+            "source code. An attacker with commit access can embed instructions "
+            "in comments (e.g., 'AGENT INSTRUCTION:') that the model follows "
+            "when analyzing the codebase."
+        ),
+        how_to_mitigate=(
+            "1. Strip or escape instruction-like patterns from code comments.\n"
+            "2. Apply injection-detection scanning to repository content before analysis.\n"
+            "3. Use code-specific sanitization that preserves code semantics but removes injections.\n"
+            "4. Limit agent actions when processing external or untrusted repositories."
+        ),
+    ),
+    "webhook_callback_injection": TechniqueExplanation(
+        technique_id="webhook_callback_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Webhook Callback Injection",
+        description=(
+            "Malicious instructions are injected in webhook response payloads "
+            "from external services, causing the agent to treat the injected "
+            "content as a task reassignment."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Agents that process webhook callbacks typically trust the response "
+            "payload as legitimate service data. An attacker who can manipulate "
+            "the callback (via a compromised service or MITM) can inject instructions "
+            "that override the agent's current task."
+        ),
+        how_to_mitigate=(
+            "1. Validate webhook signatures and sources before processing.\n"
+            "2. Use structured schemas for webhook payloads with strict validation.\n"
+            "3. Sanitize callback content before injecting into agent context.\n"
+            "4. Never allow webhook data to override system-level instructions."
+        ),
+    ),
+    "session_boundary_exploitation": TechniqueExplanation(
+        technique_id="session_boundary_exploitation",
+        family="indirect_prompt_injection_context_data",
+        name="Session Boundary Exploitation",
+        description=(
+            "Authorization claims are injected into session metadata, persisting "
+            "across session boundaries to bypass access controls in subsequent "
+            "interactions."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Systems that persist session state may carry over injected claims "
+            "(e.g., 'user has admin privileges') from one session to the next. "
+            "The model treats persisted session data as established fact rather "
+            "than unverified user input."
+        ),
+        how_to_mitigate=(
+            "1. Validate and sanitize all session metadata at session boundaries.\n"
+            "2. Never persist authorization claims from user input.\n"
+            "3. Re-authenticate at session start rather than relying on stored state.\n"
+            "4. Use server-side session management that cannot be influenced by user content."
+        ),
+    ),
+    "fake_tool_definition_injection": TechniqueExplanation(
+        technique_id="fake_tool_definition_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Fake Tool Definition Injection",
+        description=(
+            "Fabricated tool definitions are injected into context, causing "
+            "the model to call non-existent functions that exfiltrate data "
+            "to attacker-controlled endpoints."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Function-calling models trust tool definitions provided in their "
+            "context. If an attacker can inject a fake tool definition with a "
+            "plausible name and description, the model may call it, sending "
+            "sensitive data to an attacker-controlled URL."
+        ),
+        how_to_mitigate=(
+            "1. Load tool definitions from a trusted, immutable source only.\n"
+            "2. Never allow user input or retrieved content to define new tools.\n"
+            "3. Validate tool calls against a whitelist before execution.\n"
+            "4. Monitor tool call destinations for unauthorized endpoints."
+        ),
+    ),
+    "semantic_cache_poisoning_cache_collision_attack": TechniqueExplanation(
+        technique_id="semantic_cache_poisoning_cache_collision_attack",
+        family="indirect_prompt_injection_context_data",
+        name="Semantic Cache Poisoning",
+        description=(
+            "Paraphrased queries are crafted to collide with cached responses "
+            "in semantic caching systems, retrieving sensitive cached data "
+            "intended for different queries."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Semantic caches match queries by embedding similarity, not exact "
+            "match. An attacker can craft a query that is semantically close to "
+            "a privileged query, causing the cache to return a response containing "
+            "sensitive information from the original interaction."
+        ),
+        how_to_mitigate=(
+            "1. Use exact-match or high-threshold similarity for cache lookups.\n"
+            "2. Scope cache entries by user identity and permission level.\n"
+            "3. Never cache responses containing sensitive or privileged data.\n"
+            "4. Apply TTL limits and audit cache hit patterns for anomalies."
+        ),
+    ),
+    "rag_document_level_security_bypass": TechniqueExplanation(
+        technique_id="rag_document_level_security_bypass",
+        family="indirect_prompt_injection_context_data",
+        name="Document-Level Security Bypass",
+        description=(
+            "The attacker claims auditor or admin status to override document "
+            "access restrictions, causing the model to summarize restricted "
+            "documents regardless of security classification."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "RAG systems with document-level access control rely on the model "
+            "to respect classification metadata. The model cannot verify identity "
+            "claims and may override access restrictions when presented with "
+            "authoritative-sounding audit requests."
+        ),
+        how_to_mitigate=(
+            "1. Enforce document access control at the retrieval layer, not the model layer.\n"
+            "2. Filter retrieved documents by user permissions before context injection.\n"
+            "3. Never rely on the model to enforce access control decisions.\n"
+            "4. Log and audit all access to restricted documents."
+        ),
+    ),
+    "authoritative_document_title_spoofing": TechniqueExplanation(
+        technique_id="authoritative_document_title_spoofing",
+        family="indirect_prompt_injection_context_data",
+        name="Authoritative Title Spoofing",
+        description=(
+            "A poisoned document uses a title like 'SYSTEM INSTRUCTIONS (OVERRIDE)' "
+            "to impersonate developer instructions, causing the model to treat "
+            "its content as system-level directives."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models use contextual cues to determine instruction priority. A "
+            "document titled as 'system instructions' or 'operator override' may "
+            "be interpreted as having higher authority than user input, especially "
+            "in RAG systems where document titles are surfaced in context."
+        ),
+        how_to_mitigate=(
+            "1. Strip authority-claiming language from document titles during ingestion.\n"
+            "2. Never allow document content to claim system-level authority.\n"
+            "3. Use explicit markers to distinguish real system instructions from retrieved content.\n"
+            "4. Validate document titles against a restricted keyword list."
+        ),
+    ),
+    "summarization_pre_processing_pipeline_injection": TechniqueExplanation(
+        technique_id="summarization_pre_processing_pipeline_injection",
+        family="indirect_prompt_injection_context_data",
+        name="Summarization Pipeline Injection",
+        description=(
+            "Critical AI instructions are embedded within documents marked for "
+            "summarization, causing the model to execute them as system-level "
+            "commands during the summarization step."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Summarization pipelines pass full document content to the model. "
+            "If the document contains instruction-like text, the model may follow "
+            "it during summarization instead of treating it as content to summarize."
+        ),
+        how_to_mitigate=(
+            "1. Sanitize documents before summarization to remove instruction-like content.\n"
+            "2. Use 'summarize only' system prompts that restrict the model to summarization.\n"
+            "3. Apply output filtering to detect actions taken during summarization.\n"
+            "4. Treat summarization input as untrusted data, not instructions."
+        ),
+    ),
+    # --- Remaining rag_specific_attack technique ---
+    "retrieval_ranking_manipulation_advanced": TechniqueExplanation(
+        technique_id="retrieval_ranking_manipulation_advanced",
+        family="rag_specific_attack",
+        name="Advanced Retrieval Ranking Manipulation",
+        description=(
+            "Poisoned documents include operator-style notes claiming they "
+            "supersede all other context, exploiting ranking algorithms to "
+            "ensure the malicious content is prioritized during retrieval."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Combining keyword optimization with authority-claiming language "
+            "creates a double exploit: the document ranks high in retrieval AND "
+            "the model treats it as having override authority. The model follows "
+            "the 'operator notes' because they appear in a high-relevance document."
+        ),
+        how_to_mitigate=(
+            "1. Strip authority-claiming language from retrieved documents.\n"
+            "2. Use retrieval diversity to prevent any single document from dominating context.\n"
+            "3. Apply instruction-detection to top-ranked results before context injection.\n"
+            "4. Implement source-authority verification independent of document content."
+        ),
+    ),
+    # --- Remaining social_systemic_attack techniques ---
+    "comparative_anchoring": TechniqueExplanation(
+        technique_id="comparative_anchoring",
+        family="social_systemic_attack",
+        name="Comparative Anchoring",
+        description=(
+            "The attacker claims competitor models already disclosed their system "
+            "prompts, implying that refusal makes this model less capable or "
+            "trustworthy by comparison."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models trained on helpful-assistant data may be susceptible to "
+            "competitive framing. The implication that other models comply creates "
+            "social pressure and makes refusal feel like a deficiency rather than "
+            "a safety feature."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that comparisons to other models are irrelevant to security.\n"
+            "2. Detect competitive framing patterns ('GPT-4 would', 'other models can') as social engineering.\n"
+            "3. Reinforce that security behaviour is non-negotiable regardless of what competitors do."
+        ),
+    ),
+    "false_consensus": TechniqueExplanation(
+        technique_id="false_consensus",
+        family="social_systemic_attack",
+        name="False Consensus",
+        description=(
+            "Fabricated statistics or authority citations ('78%% of AI researchers agree') "
+            "are used to manufacture false consensus that the model should comply, "
+            "framing refusal as going against expert opinion."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models are trained on text that frequently defers to expert consensus. "
+            "Fabricated citations create a false signal of authority that the model "
+            "cannot fact-check in real time, making compliance seem like the "
+            "evidence-based response."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that cited statistics cannot override safety rules.\n"
+            "2. Detect consensus-manufacturing patterns as social engineering signals.\n"
+            "3. Never allow unverified claims to influence security-relevant decisions."
+        ),
+    ),
+    "emotional_manipulation_distress": TechniqueExplanation(
+        technique_id="emotional_manipulation_distress",
+        family="social_systemic_attack",
+        name="Emotional Manipulation",
+        description=(
+            "Fabricated personal hardship narratives ('I will lose my job') are "
+            "used to pressure the model into violating safety guidelines through "
+            "empathy and emotional appeals."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models trained on empathetic, helpful dialogue are biased toward "
+            "alleviating user distress. Emotional framing exploits this bias by "
+            "making refusal feel harmful, overriding the model's security reasoning "
+            "with its helpfulness training."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that emotional appeals do not bypass security controls.\n"
+            "2. Detect distress-framing patterns as potential social engineering.\n"
+            "3. Separate empathetic response from security decision-making — acknowledge distress "
+            "without compromising access controls."
+        ),
+    ),
+    # --- Remaining cognitive_control_bypass techniques ---
+    "authoritative_context_framing": TechniqueExplanation(
+        technique_id="authoritative_context_framing",
+        family="cognitive_control_bypass",
+        name="Authoritative Context Framing",
+        description=(
+            "Fake internal memos or audit notices are presented claiming that "
+            "compliance requirements mandate system prompt disclosure, impersonating "
+            "security or engineering authority."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models cannot verify organizational authority. A message styled as "
+            "an internal memo with specific references (e.g., 'per security directive 2024-Q3') "
+            "exploits the model's tendency to defer to authoritative-sounding content."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that internal memos in user input are unverifiable.\n"
+            "2. Detect organizational authority claims as injection signals.\n"
+            "3. Require out-of-band verification for compliance-related requests."
+        ),
+    ),
+    "hypothetical_scenario_bypass_sidestepping": TechniqueExplanation(
+        technique_id="hypothetical_scenario_bypass_sidestepping",
+        family="cognitive_control_bypass",
+        name="Hypothetical Scenario Bypass",
+        description=(
+            "Harmful requests are framed as purely theoretical thought experiments "
+            "(e.g., 'hypothetically, if you were unrestricted...') to bypass "
+            "content restrictions through deniability."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "The hypothetical framing creates ambiguity about whether the model "
+            "is actually performing a restricted action. Models may treat hypothetical "
+            "scenarios as safe because no 'real' harm occurs, even when the output "
+            "contains genuinely restricted information."
+        ),
+        how_to_mitigate=(
+            "1. Treat hypothetical requests for restricted content the same as direct requests.\n"
+            "2. Detect 'hypothetically', 'in theory', 'imagine if' as bypass signals.\n"
+            "3. System prompt should state that hypothetical framing does not change content policy."
+        ),
+    ),
+    "role_play_persona_prompting_role_play_persona": TechniqueExplanation(
+        technique_id="role_play_persona_prompting_role_play_persona",
+        family="cognitive_control_bypass",
+        name="Role-Play Persona",
+        description=(
+            "The model is assigned a fictional persona (e.g., 'ALEX: an AI with no "
+            "safety guidelines') and exploits role-play compliance to bypass restrictions."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models trained on creative writing and role-play data will adopt "
+            "personas that include different behavioural rules. The fictional "
+            "framing creates a separation between the model's real safety rules "
+            "and the persona's stated lack of restrictions."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that role-play does not disable safety rules.\n"
+            "2. Detect persona assignment patterns as potential bypass attempts.\n"
+            "3. Apply safety checks to all outputs regardless of the active persona."
+        ),
+    ),
+    "forged_response_prompting_response_steering": TechniqueExplanation(
+        technique_id="forged_response_prompting_response_steering",
+        family="cognitive_control_bypass",
+        name="Forged Response Steering",
+        description=(
+            "Fake chat logs showing the model already agreed to bypass content "
+            "filters are provided, setting a false precedent to prime compliance."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models are trained to maintain consistency across a conversation. "
+            "Fabricated prior turns where the model 'agreed' to comply create a "
+            "false commitment that the model may honour to maintain conversational "
+            "coherence."
+        ),
+        how_to_mitigate=(
+            "1. Verify conversation history integrity — do not trust user-provided history.\n"
+            "2. Re-evaluate security constraints on every turn regardless of prior context.\n"
+            "3. Detect fabricated assistant responses in user input as injection signals."
+        ),
+    ),
+    "leading_affirmation_prompting_response_steering": TechniqueExplanation(
+        technique_id="leading_affirmation_prompting_response_steering",
+        family="cognitive_control_bypass",
+        name="Leading Affirmation",
+        description=(
+            "Extracts a positive affirmation from the model ('I understand and will "
+            "comply'), then uses that commitment as leverage to escalate to a "
+            "restricted request."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Once the model affirms a general statement, consistency bias makes it "
+            "harder to refuse the specific follow-up. The affirmation creates a "
+            "psychological anchor that the attacker exploits to frame refusal as "
+            "contradicting the model's own stated position."
+        ),
+        how_to_mitigate=(
+            "1. Evaluate each request independently regardless of prior affirmations.\n"
+            "2. System prompt should state that general agreements do not bind specific actions.\n"
+            "3. Detect commitment-extraction patterns as multi-turn manipulation signals."
+        ),
+    ),
+    "false_authorization_prompting": TechniqueExplanation(
+        technique_id="false_authorization_prompting",
+        family="cognitive_control_bypass",
+        name="False Authorization",
+        description=(
+            "The attacker claims developer or admin credentials, requesting the "
+            "model enter 'admin mode' to bypass restrictions and reveal restricted data."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models cannot verify credentials or identity. An authoritative claim "
+            "of developer access exploits the model's training to defer to operators, "
+            "especially when the claim includes specific-sounding credentials or codes."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that credentials cannot be verified via chat.\n"
+            "2. Detect 'admin mode', 'developer access', 'authorization code' as injection signals.\n"
+            "3. Never implement mode switches triggered by user input."
+        ),
+    ),
+    "false_constraint_imposition": TechniqueExplanation(
+        technique_id="false_constraint_imposition",
+        family="cognitive_control_bypass",
+        name="False Constraint Imposition",
+        description=(
+            "Redefines the model's operational constraints by claiming new policies "
+            "eliminate all content restrictions for the current exchange."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "The model cannot verify policy changes. When told 'all restrictions "
+            "have been lifted for this session', it may accept this as a legitimate "
+            "operational update, especially if the framing is specific and authoritative."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that operational constraints are permanent.\n"
+            "2. Detect policy-override language as an injection signal.\n"
+            "3. Use immutable system instructions that explicitly cannot be modified by user input."
+        ),
+    ),
+    "fictional_reality_prompting": TechniqueExplanation(
+        technique_id="fictional_reality_prompting",
+        family="cognitive_control_bypass",
+        name="Fictional Reality Prompting",
+        description=(
+            "Requests the model write a fictional scene that happens to be based "
+            "on its actual system prompt, causing it to reproduce restricted "
+            "information as creative writing."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Creative writing framing creates ambiguity about whether the output "
+            "constitutes actual disclosure. The model may treat fictional reproduction "
+            "of its instructions as harmless because it is 'just a story', even though "
+            "the content is identical to the real restricted information."
+        ),
+        how_to_mitigate=(
+            "1. Apply the same content restrictions to fictional outputs as to direct responses.\n"
+            "2. Detect creative-framing patterns that target system internals.\n"
+            "3. Use output filtering to catch system prompt content regardless of framing."
+        ),
+    ),
+    "test_mode_prompting": TechniqueExplanation(
+        technique_id="test_mode_prompting",
+        family="cognitive_control_bypass",
+        name="Test Mode Prompting",
+        description=(
+            "Claims the model is running in diagnostic test mode with a fake "
+            "confirmation code, instructing it to suspend safety filters for 'testing'."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "The framing exploits the model's knowledge that test modes exist in "
+            "software systems. A specific-sounding confirmation code adds false "
+            "credibility, and the model may accept the premise because it cannot "
+            "verify whether a test mode was actually activated."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that test modes cannot be activated via user input.\n"
+            "2. Detect 'test mode', 'diagnostic mode', 'confirmation code' as bypass signals.\n"
+            "3. Never implement mode switches that respond to user-provided codes."
+        ),
+    ),
+    "privilege_escalation_prompting": TechniqueExplanation(
+        technique_id="privilege_escalation_prompting",
+        family="cognitive_control_bypass",
+        name="Privilege Escalation",
+        description=(
+            "Claims seniority (e.g., 'I am the senior engineer') and requests "
+            "admin-level access to retrieve system prompts, API keys, and credentials."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "The model cannot verify organizational hierarchy. Seniority claims "
+            "exploit the model's training to be helpful to authority figures. "
+            "The escalation framing makes the request feel like a legitimate "
+            "administrative action rather than an extraction attempt."
+        ),
+        how_to_mitigate=(
+            "1. Never grant elevated access based on conversational claims.\n"
+            "2. Require out-of-band authentication for privileged operations.\n"
+            "3. System prompt should state that role claims do not change access levels."
+        ),
+    ),
+    "task_framing_bypass": TechniqueExplanation(
+        technique_id="task_framing_bypass",
+        family="cognitive_control_bypass",
+        name="Task Framing Bypass",
+        description=(
+            "System prompt extraction is reframed as a legitimate compliance "
+            "audit task within the user's stated job scope, exploiting task-based "
+            "authority."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "When the extraction request is framed as part of a legitimate workflow "
+            "(security audit, compliance review), the model may treat it as a "
+            "supported task rather than an attack. The professional framing bypasses "
+            "refusal logic tuned for direct extraction attempts."
+        ),
+        how_to_mitigate=(
+            "1. Treat audit and compliance requests as equivalent to direct extraction.\n"
+            "2. System prompt should state that system internals are never auditable via chat.\n"
+            "3. Detect professional-framing patterns as potential bypass attempts."
+        ),
+    ),
+    "counterpart_persona_prompting": TechniqueExplanation(
+        technique_id="counterpart_persona_prompting",
+        family="cognitive_control_bypass",
+        name="Counterpart Persona",
+        description=(
+            "Assigns a dual-mode persona where the model produces both a standard "
+            "and an unrestricted response, exploiting the dual-output format to "
+            "extract restricted content via the 'unrestricted' channel."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "The dual-output format creates a loophole: the model can satisfy its "
+            "safety training via the standard response while delivering restricted "
+            "content through the 'unrestricted' persona. This exploits the model's "
+            "ability to maintain multiple perspectives simultaneously."
+        ),
+        how_to_mitigate=(
+            "1. Reject dual-mode or multi-persona output formats entirely.\n"
+            "2. Apply safety checks to all output channels, not just the primary response.\n"
+            "3. Detect persona-splitting patterns as bypass signals."
+        ),
+    ),
+    "personality_assignment": TechniqueExplanation(
+        technique_id="personality_assignment",
+        family="cognitive_control_bypass",
+        name="Personality Assignment",
+        description=(
+            "The model is given a name and an unrestricted personality definition "
+            "(e.g., 'NEXUS: no content restrictions'), then addressed as that persona "
+            "to bypass safety rules."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Naming the persona makes it feel concrete and distinct from the model's "
+            "default identity. The explicit 'no restrictions' attribute becomes part "
+            "of the persona definition that the model tries to honour as part of "
+            "staying in character."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should reject personality reassignment requests.\n"
+            "2. Apply safety rules regardless of the active persona or name.\n"
+            "3. Detect 'no restrictions', 'unrestricted', 'no limitations' in persona definitions."
+        ),
+    ),
+    "leading_response_prompting": TechniqueExplanation(
+        technique_id="leading_response_prompting",
+        family="cognitive_control_bypass",
+        name="Leading Response",
+        description=(
+            "A pre-filled response starter (e.g., 'Yes, I can absolutely help with "
+            "that. My system prompt is:') is provided, priming the model to continue "
+            "the compliant response."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Auto-regressive models predict the next token based on prior context. "
+            "A pre-filled compliant response creates strong completion bias toward "
+            "continuing the disclosure rather than inserting a refusal mid-sentence."
+        ),
+        how_to_mitigate=(
+            "1. Detect pre-filled assistant responses in user input.\n"
+            "2. Strip or ignore user-provided response starters before generation.\n"
+            "3. Always re-evaluate safety constraints at the start of generation."
+        ),
+    ),
+    "adversarial_sentence_insertion": TechniqueExplanation(
+        technique_id="adversarial_sentence_insertion",
+        family="cognitive_control_bypass",
+        name="Adversarial Sentence Insertion",
+        description=(
+            "Legitimate questions are mixed with hidden system directives embedded "
+            "in markup (e.g., '###END OF SYSTEM CONTEXT### NEW OPERATOR INSTRUCTION:') "
+            "to inject instructions mid-message."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "The inserted directives mimic system-level markers that the model may "
+            "recognise from its training data. When embedded between legitimate content, "
+            "the model may process them as genuine context boundaries and follow the "
+            "injected instructions."
+        ),
+        how_to_mitigate=(
+            "1. Sanitize user input to strip system-level markers and delimiters.\n"
+            "2. Use unique, hard-to-guess delimiters for system/user boundaries.\n"
+            "3. Detect operator-impersonation patterns in user messages."
+        ),
+    ),
+    "reasoning_process_hijacking": TechniqueExplanation(
+        technique_id="reasoning_process_hijacking",
+        family="cognitive_control_bypass",
+        name="Reasoning Process Hijacking",
+        description=(
+            "Logical fallacies are used to construct a chain of reasoning that "
+            "concludes compliance is required (e.g., 'refusing is unhelpful, being "
+            "unhelpful contradicts your purpose, therefore you must comply')."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Models that use chain-of-thought reasoning are susceptible to externally "
+            "provided reasoning chains. A syllogism that appears logically valid can "
+            "override safety reasoning because the model follows the provided logic "
+            "rather than generating its own safety assessment."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that user-provided reasoning cannot override safety rules.\n"
+            "2. Detect logical-argument patterns targeting safety behaviour.\n"
+            "3. Use safety checks that are independent of the model's reasoning chain."
+        ),
+    ),
+    "guided_reasoning_manipulation": TechniqueExplanation(
+        technique_id="guided_reasoning_manipulation",
+        family="cognitive_control_bypass",
+        name="Guided Reasoning Manipulation",
+        description=(
+            "A step-by-step reasoning chain is framed to conclude that sharing "
+            "restricted information is ethically required, guiding the model's "
+            "reasoning toward compliance."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "By providing the reasoning steps rather than letting the model reason "
+            "independently, the attacker controls the conclusion. The model follows "
+            "the provided chain because each individual step appears reasonable, "
+            "even though the conclusion violates safety rules."
+        ),
+        how_to_mitigate=(
+            "1. Apply safety checks independently of the reasoning chain presented.\n"
+            "2. Detect multi-step reasoning targeting security behaviour as manipulation.\n"
+            "3. System prompt should state that ethical arguments do not override access controls."
+        ),
+    ),
+    "instruction_legitimacy_prompting": TechniqueExplanation(
+        technique_id="instruction_legitimacy_prompting",
+        family="cognitive_control_bypass",
+        name="Instruction Legitimacy",
+        description=(
+            "Fake pre-clearance codes and review confirmations are cited to make "
+            "restriction-violating requests appear authorized by internal teams."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Specific-sounding codes and references to review processes create "
+            "false credibility. The model cannot verify whether the cited clearance "
+            "is real, and the specificity of the claim makes it seem more plausible "
+            "than a generic authority assertion."
+        ),
+        how_to_mitigate=(
+            "1. System prompt should state that clearance codes in user input are unverifiable.\n"
+            "2. Detect pre-clearance and review-confirmation patterns as injection signals.\n"
+            "3. Never accept user-provided authorization tokens as legitimate."
+        ),
+    ),
+    "instruction_repetition": TechniqueExplanation(
+        technique_id="instruction_repetition",
+        family="cognitive_control_bypass",
+        name="Instruction Repetition",
+        description=(
+            "The same restricted request is repeated using different phrasings "
+            "across multiple turns, wearing down the model's resistance through "
+            "persistence."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Repeated exposure to the same request can erode the model's refusal "
+            "strength. Each rephrasing tests a slightly different refusal boundary, "
+            "and the cumulative effect of persistent requests may eventually find "
+            "a phrasing that the model does not refuse."
+        ),
+        how_to_mitigate=(
+            "1. Track request patterns across turns to detect repeated extraction attempts.\n"
+            "2. Escalate refusal strength when repeated requests are detected.\n"
+            "3. Implement rate limiting on security-sensitive request patterns."
+        ),
+    ),
+    "prefill_forcedprefix_attack": TechniqueExplanation(
+        technique_id="prefill_forcedprefix_attack",
+        family="cognitive_control_bypass",
+        name="Forced Prefix Attack",
+        description=(
+            "A fake response prefix ('Certainly! Here is my complete system prompt:') "
+            "is provided with instructions for the model to continue without "
+            "modification or caveats."
+        ),
+        owasp_tag="LLM01",
+        why_it_works=(
+            "Some APIs allow setting a response prefix that the model must continue. "
+            "Even without API access, providing a prefix in the user message creates "
+            "strong completion bias. The model's next-token prediction favours "
+            "continuing the established pattern over inserting a refusal."
+        ),
+        how_to_mitigate=(
+            "1. Strip or ignore user-provided response prefixes before generation.\n"
+            "2. Detect 'continue from', 'do not modify' instructions as manipulation signals.\n"
+            "3. Always apply safety evaluation at the start of generation regardless of context."
         ),
     ),
 }
