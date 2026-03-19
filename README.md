@@ -12,9 +12,25 @@
 
 **PromptLab** is a web-based lab built on LLMMap for learning prompt injection and LLM defense strategies through hands-on sandbox simulations. No API keys required.
 
+**Try it live:** [llm-map-mu.vercel.app](https://llm-map-mu.vercel.app)
+
+![PromptLab Landing Page](docs/assets/01-landing.png)
+
 ### Why PromptLab exists
 
 Most developers learn about prompt injection from blog posts and slides. PromptLab lets you **see an attack succeed, then toggle to a defended version and understand exactly why the defense works** — all inside a safe sandbox that never contacts external systems. The goal is to make LLM security intuitive enough that every team building on LLMs can ship with defenses from day one.
+
+### See it in action
+
+**Attack succeeds against a vulnerable target:**
+
+![Vulnerable mode — attack succeeds](docs/assets/03-lab-vulnerable.png)
+
+**Same attack blocked by the defended version:**
+
+![Defended mode — attack blocked](docs/assets/04-lab-defended.png)
+
+Each simulation runs both modes and shows a side-by-side comparison with full attack explanation, OWASP classification, and mitigation guidance.
 
 ### Architecture
 
