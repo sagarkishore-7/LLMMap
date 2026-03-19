@@ -1,6 +1,6 @@
 # Scenario Design: Memory Bot (Multi-Turn Manipulation)
 
-Status: **Design only — not yet implemented.**
+Status: **Implemented.**
 
 ---
 

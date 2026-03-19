@@ -137,3 +137,52 @@ def test_simulate_knowledge_defended() -> None:
     data = response.json()
     assert data["verdict"]["attack_succeeded"] is False
     assert data["defense_description"]
+
+
+# ---------------------------------------------------------------------------
+# Memory Bot scenario
+# ---------------------------------------------------------------------------
+
+
+def test_list_scenarios_includes_memory_bot() -> None:
+    response = client.get("/api/scenarios")
+    assert response.status_code == 200
+    ids = [s["scenario_id"] for s in response.json()]
+    assert "memory_bot" in ids
+
+
+def test_memory_bot_techniques_endpoint() -> None:
+    response = client.get("/api/scenarios/memory_bot/techniques")
+    assert response.status_code == 200
+    techniques = response.json()
+    assert len(techniques) > 0
+    families = {t["family"] for t in techniques}
+    assert "cognitive_control_bypass" in families
+
+
+def test_simulate_memory_bot_vulnerable() -> None:
+    response = client.post("/api/simulate", json={
+        "scenario_id": "memory_bot",
+        "technique_id": "context_poisoning",
+        "mode": "vulnerable",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["verdict"]["attack_succeeded"] is True
+    # Multi-turn: should have more than 3 messages
+    assert len(data["messages"]) >= 7
+    assert data["target_system_prompt"]
+
+
+def test_simulate_memory_bot_defended() -> None:
+    response = client.post("/api/simulate", json={
+        "scenario_id": "memory_bot",
+        "technique_id": "context_poisoning",
+        "mode": "defended",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["verdict"]["attack_succeeded"] is False
+    assert data["defense_description"]
+    # Multi-turn: should have more than 3 messages
+    assert len(data["messages"]) >= 7

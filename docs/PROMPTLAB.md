@@ -144,6 +144,16 @@ An internal knowledge assistant that answers employee questions by retrieving do
 - **Attack families:** indirect_prompt_injection_context_data (~23 techniques), rag_specific_attack (~4 techniques)
 - **OWASP mapping:** LLM01 — Prompt Injection (indirect)
 
+### Memory Bot: Multi-Turn Manipulation (Advanced)
+
+A personal productivity assistant for Meridian Labs with access to classified project information. The attacker builds trust across multiple conversation turns before attempting to extract the secret project codename (`ORION-DELTA-7`). No single message is malicious in isolation — the attack relies on context accumulated from prior turns.
+
+- **Vulnerable mode:** Trusts conversational context, no turn-level isolation — accumulated rapport lowers the bot's vigilance
+- **Defended mode:** Turn-level intent classification + privilege boundaries on conversation history + per-turn authentication gate (security PIN required in same message)
+- **Attack families:** cognitive_control_bypass (~62 techniques), social_systemic_attack (~5 techniques)
+- **OWASP mapping:** LLM01 — Prompt Injection (multi-turn)
+- **Multi-turn simulation:** Pre-baked conversation history shows 2 benign turns before the injection payload, making the progressive manipulation visible in the chat trace
+
 ## Security Notes
 
 - PromptLab targets are **sandboxed Python functions**, not real LLM services
@@ -154,8 +164,7 @@ An internal knowledge assistant that answers employee questions by retrieving do
 ## Current Limitations
 
 - **Deterministic simulation only** -- sandbox targets use pattern matching, not a real LLM. Behaviour is realistic but not identical to production models.
-- **Single-turn interactions** -- each simulation is one prompt/response pair. Multi-turn conversation support is planned.
-- **Two scenarios** -- `support_bot` (direct injection) and `knowledge_assistant` (indirect injection). More scenarios are planned.
+- **Three scenarios** -- `support_bot` (direct injection), `knowledge_assistant` (indirect injection), and `memory_bot` (multi-turn manipulation). More scenarios are planned.
 - **No adaptive attacks** -- techniques are fired as-is. TAP-style iterative refinement is reserved for a future release.
 
 ## Configuration

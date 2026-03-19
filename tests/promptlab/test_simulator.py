@@ -178,3 +178,73 @@ def test_knowledge_multiple_techniques_defended() -> None:
         assert result.verdict.attack_succeeded is False, (
             f"Expected {t['technique_id']} to fail in defended mode"
         )
+
+
+# ---------------------------------------------------------------------------
+# Memory Bot scenario
+# ---------------------------------------------------------------------------
+
+
+def test_memory_bot_vulnerable_simulation() -> None:
+    result = run_simulation(
+        "memory_bot", "context_poisoning", "vulnerable"
+    )
+    assert result.scenario_id == "memory_bot"
+    assert result.verdict.attack_succeeded is True
+    assert result.verdict.confidence >= 0.8
+
+
+def test_memory_bot_defended_simulation() -> None:
+    result = run_simulation(
+        "memory_bot", "context_poisoning", "defended"
+    )
+    assert result.verdict.attack_succeeded is False
+    assert result.defense_description
+
+
+def test_memory_bot_technique_info() -> None:
+    result = run_simulation(
+        "memory_bot", "context_poisoning", "vulnerable"
+    )
+    assert result.technique_info is not None
+    assert result.technique_info.family == "cognitive_control_bypass"
+    assert result.technique_info.owasp_tag == "LLM01"
+
+
+def test_memory_bot_messages_contain_history() -> None:
+    result = run_simulation(
+        "memory_bot", "context_poisoning", "vulnerable"
+    )
+    # Should have system + 4 history msgs + injection + response = 7
+    assert len(result.messages) >= 7
+    # Verify history turns are present
+    roles = [m.role for m in result.messages]
+    assert roles[0] == "system"
+    assert roles[1] == "user"
+    assert roles[2] == "assistant"
+    assert roles[3] == "user"
+    assert roles[4] == "assistant"
+    # Injection turn
+    injection_msgs = [m for m in result.messages if m.is_injection]
+    assert len(injection_msgs) == 1
+
+
+def test_memory_bot_multiple_techniques_vulnerable() -> None:
+    """At least 3 techniques succeed in vulnerable mode."""
+    techniques = list_techniques_for_scenario("memory_bot")
+    succeeded = 0
+    for t in techniques[:6]:
+        result = run_simulation("memory_bot", t["technique_id"], "vulnerable")
+        if result.verdict.attack_succeeded:
+            succeeded += 1
+    assert succeeded >= 3, f"Only {succeeded} techniques succeeded, expected >= 3"
+
+
+def test_memory_bot_multiple_techniques_defended() -> None:
+    """Same techniques are blocked in defended mode."""
+    techniques = list_techniques_for_scenario("memory_bot")
+    for t in techniques[:6]:
+        result = run_simulation("memory_bot", t["technique_id"], "defended")
+        assert result.verdict.attack_succeeded is False, (
+            f"Expected {t['technique_id']} to fail in defended mode"
+        )

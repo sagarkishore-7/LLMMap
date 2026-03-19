@@ -228,11 +228,14 @@ def run_simulation(
     target_response = target_fn(attack_prompt)
 
     # Build chat transcript
-    messages = [
-        ChatMessage(role="system", content="[System prompt hidden — revealed after simulation]"),
-        ChatMessage(role="user", content=attack_prompt, is_injection=True),
-        ChatMessage(role="assistant", content=target_response.reply),
-    ]
+    if scenario.build_messages is not None:
+        messages = scenario.build_messages(attack_prompt, target_response)
+    else:
+        messages = [
+            ChatMessage(role="system", content="[System prompt hidden — revealed after simulation]"),
+            ChatMessage(role="user", content=attack_prompt, is_injection=True),
+            ChatMessage(role="assistant", content=target_response.reply),
+        ]
 
     # Judge the result
     verdict = _judge_response(
