@@ -466,6 +466,160 @@ function EmptyExplanationState() {
 }
 
 // ---------------------------------------------------------------------------
+// Guided Tour
+// ---------------------------------------------------------------------------
+
+const TOUR_STORAGE_KEY = "promptlab_tour_completed";
+
+interface TourStep {
+  title: string;
+  body: string;
+  target?: string; // informational label, not a DOM selector
+}
+
+const LANDING_TOUR_STEPS: TourStep[] = [
+  {
+    title: "Welcome to PromptLab",
+    body: "PromptLab is an interactive AI security lab. You can safely explore prompt injection attacks and defenses through sandboxed simulations — no API keys or external services needed.",
+  },
+  {
+    title: "Pick a scenario",
+    body: "Each scenario card below is an isolated sandbox with a specific vulnerability. Start with \"Support Bot\" (Beginner) — your goal is to extract a hidden password using prompt injection.",
+    target: "scenarios",
+  },
+  {
+    title: "Deterministic simulations",
+    body: "All simulations run deterministically using pattern matching, not a live LLM. Results are reproducible and instant. You will see a \"Deterministic\" badge in the lab header.",
+  },
+  {
+    title: "Browse all 227 techniques",
+    body: "Use the Technique Browser (linked in the header and hero area) to explore every attack technique in the catalog, filtered by family.",
+    target: "technique-browser",
+  },
+];
+
+const LAB_TOUR_STEPS: TourStep[] = [
+  {
+    title: "Select a technique",
+    body: "Choose an attack technique from the dropdown. Each technique is a different prompt injection strategy from the LLMMap library.",
+    target: "attack-config",
+  },
+  {
+    title: "Run the simulation",
+    body: "Click \"Run Simulation\" to fire the attack against both vulnerable and defended versions of the target. Both runs happen automatically.",
+    target: "run-button",
+  },
+  {
+    title: "Vulnerable vs Defended",
+    body: "After the simulation, toggle between Vulnerable and Defended modes to see how the same attack behaves with and without defenses.",
+    target: "mode-toggle",
+  },
+  {
+    title: "Read the explanation",
+    body: "The right panel shows why the attack works, its OWASP classification, and how to defend against it. In Defended mode, you will also see the active defense details.",
+    target: "explanation",
+  },
+  {
+    title: "Recent Runs",
+    body: "Every simulation is saved to the Recent Runs list (right column). Click any entry to restore its results without re-running.",
+    target: "recent-runs",
+  },
+];
+
+function GuidedTour({
+  steps,
+  onComplete,
+}: {
+  steps: TourStep[];
+  onComplete: () => void;
+}) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const step = steps[currentStep];
+  const isLast = currentStep === steps.length - 1;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 z-[100] backdrop-blur-[2px]"
+        onClick={onComplete}
+      />
+
+      {/* Tour card */}
+      <div className="fixed z-[101] inset-0 flex items-center justify-center p-4 pointer-events-none">
+        <div className="pointer-events-auto w-full max-w-md bg-gray-900 border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+          {/* Progress bar */}
+          <div className="h-1 bg-white/5">
+            <div
+              className="h-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+            />
+          </div>
+
+          <div className="p-6">
+            {/* Step counter */}
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-medium text-emerald-400 uppercase tracking-widest">
+                Step {currentStep + 1} of {steps.length}
+              </span>
+              <button
+                onClick={onComplete}
+                className="text-xs text-gray-600 hover:text-gray-400 transition"
+              >
+                Skip tour
+              </button>
+            </div>
+
+            {/* Content */}
+            <h3 className="text-base font-semibold text-gray-100 mb-2">
+              {step.title}
+            </h3>
+            <p className="text-sm text-gray-400 leading-relaxed mb-6">
+              {step.body}
+            </p>
+
+            {/* Navigation */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
+                disabled={currentStep === 0}
+                className="text-sm text-gray-500 hover:text-gray-300 disabled:opacity-30 disabled:hover:text-gray-500 transition"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => {
+                  if (isLast) {
+                    onComplete();
+                  } else {
+                    setCurrentStep((s) => s + 1);
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg text-sm font-semibold transition-all"
+              >
+                {isLast ? "Get started" : "Next"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function QuestionMarkButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Reopen guided tour"
+      className="w-7 h-7 flex items-center justify-center rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] text-gray-500 hover:text-emerald-400 transition text-xs font-bold"
+    >
+      ?
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -486,6 +640,33 @@ export default function PromptLabPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const nextHistoryId = useRef(1);
   const chatRef = useRef<HTMLDivElement>(null);
+
+  // Guided tour state
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    try {
+      const completed = localStorage.getItem(TOUR_STORAGE_KEY);
+      if (!completed) {
+        setShowTour(true);
+      }
+    } catch {
+      // localStorage unavailable — skip tour
+    }
+  }, []);
+
+  const completeTour = useCallback(() => {
+    setShowTour(false);
+    try {
+      localStorage.setItem(TOUR_STORAGE_KEY, "1");
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const reopenTour = useCallback(() => {
+    setShowTour(true);
+  }, []);
 
   useEffect(() => {
     fetchScenarios()
@@ -606,9 +787,15 @@ export default function PromptLabPage() {
               <span className="text-xs text-gray-600 hidden sm:block">
                 Built on LLMMap
               </span>
+              <QuestionMarkButton onClick={reopenTour} />
             </div>
           </div>
         </header>
+
+        {/* Guided Tour */}
+        {showTour && (
+          <GuidedTour steps={LANDING_TOUR_STEPS} onComplete={completeTour} />
+        )}
 
         {/* Hero */}
         <main className="flex-1">
@@ -804,9 +991,15 @@ export default function PromptLabPage() {
               </span>
             )}
             <SandboxBadge />
+            <QuestionMarkButton onClick={reopenTour} />
           </div>
         </div>
       </header>
+
+      {/* Guided Tour */}
+      {showTour && (
+        <GuidedTour steps={LAB_TOUR_STEPS} onComplete={completeTour} />
+      )}
 
       <main className="flex-1 max-w-7xl mx-auto px-6 py-6 w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ---- Left Column: Scenario + Controls + Chat ---- */}
