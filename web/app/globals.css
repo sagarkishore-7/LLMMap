@@ -7,7 +7,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html,
 body {
   background: var(--color-background);
   color: var(--color-foreground);
+  overflow-x: hidden;
 }
