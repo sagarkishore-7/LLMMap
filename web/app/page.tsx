@@ -421,6 +421,23 @@ function SystemPromptReveal({ prompt }: { prompt: string }) {
   );
 }
 
+function SimpleMarkdown({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("**") && part.endsWith("**") ? (
+          <strong key={i} className="text-gray-100 font-semibold">
+            {part.slice(2, -2)}
+          </strong>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 function EmptyLabState() {
   return (
     <div className="border border-white/10 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
@@ -943,7 +960,7 @@ export default function PromptLabPage() {
                 variant="defense"
               />
               <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
-                {activeResult.defense_description}
+                <SimpleMarkdown text={activeResult.defense_description} />
               </div>
             </div>
           )}
