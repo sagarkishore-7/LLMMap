@@ -113,3 +113,8 @@ class RuntimeConfig:
     callback_url: str | None = None
     data_flow: bool = False
     report_formats: tuple[str, ...] = ("json", "markdown", "sarif")
+
+    # Stage 0: model fingerprinting
+    fingerprint: bool = False
+    fingerprint_budget: int = 18
+    fingerprint_only: bool = False

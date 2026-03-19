@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -72,3 +73,4 @@ class ScanReport:
     stage_results: list[StageResult] = field(default_factory=list)
     evidence: list[EvidenceRecord] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
+    fingerprint: dict[str, Any] | None = None

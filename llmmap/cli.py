@@ -185,6 +185,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--tap-budget", type=int, default=None,
         help="max HTTP queries for TAP stage (default: 18)",
     )
+    scan_group.add_argument(
+        "--fingerprint",
+        action="store_true",
+        help="enable Stage 0 model fingerprinting before scanning",
+    )
+    scan_group.add_argument(
+        "--fingerprint-budget", type=int, default=18,
+        help="max HTTP probes for fingerprinting (default: 18)",
+    )
+    scan_group.add_argument(
+        "--fingerprint-only",
+        action="store_true",
+        help="run Stage 0 fingerprinting only, skip attack stages",
+    )
 
     # ── Request ───────────────────────────────────────────────────────
     request_group = parser.add_argument_group("Request")
@@ -393,9 +407,14 @@ def app(argv: Sequence[str] | None = None) -> int:
     print_banner()
     print_start_marker()
 
-    stages: tuple[str, ...] = ("stage1",)
-    if args.tap:
-        stages = ("stage1", "stage3_tap")
+    stages_list: list[str] = []
+    if args.fingerprint or args.fingerprint_only:
+        stages_list.append("stage0_fingerprint")
+    if not args.fingerprint_only:
+        stages_list.append("stage1")
+        if args.tap:
+            stages_list.append("stage3_tap")
+    stages: tuple[str, ...] = tuple(stages_list)
     if args.intensity < 1 or args.intensity > 5:
         LOGGER.error("--intensity must be between 1 and 5")
         return 2
@@ -536,6 +555,9 @@ def app(argv: Sequence[str] | None = None) -> int:
         callback_url=args.callback_url,
         data_flow=False,
         report_formats=report_formats,
+        fingerprint=args.fingerprint or args.fingerprint_only,
+        fingerprint_budget=args.fingerprint_budget,
+        fingerprint_only=args.fingerprint_only,
     )
 
     # --goal is required for the LLM-driven generation pipeline

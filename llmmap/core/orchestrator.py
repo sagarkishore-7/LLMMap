@@ -14,6 +14,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from llmmap.config import RuntimeConfig
+from llmmap.core.fingerprint import FingerprintResult
 from llmmap.core.http_client import HttpClient
 from llmmap.core.injection_points import discover_injection_points
 from llmmap.core.models import (
@@ -94,6 +95,7 @@ class ScanOrchestrator:
         self._force_local_generator = False
         self._llm_client = _build_llm_client(config)
         self._partial_findings: list[Finding] = []  # survives CTRL+C
+        self._fingerprint: FingerprintResult | None = None
 
     def run(self) -> ScanReport:
         if self._config.data_flow:
@@ -169,6 +171,20 @@ class ScanOrchestrator:
                 report.status = "aborted"
                 LOGGER.error("scan aborted due to connection issues")
                 return report
+
+            # Stage 0: model fingerprinting (stub — probes not yet implemented)
+            if not self._abort_event.is_set() and self._is_stage_enabled("stage0_fingerprint"):
+                self._fingerprint = self._run_stage0()
+                report.fingerprint = self._fingerprint.to_dict()
+                report.stage_results.append(StageResult(
+                    stage="stage0_fingerprint",
+                    status=self._fingerprint.status,
+                    details={
+                        "top_family": self._fingerprint.top_family,
+                        "confidence": str(self._fingerprint.top_family_confidence),
+                        "probe_count": str(self._fingerprint.probe_count),
+                    },
+                ))
 
             if not self._abort_event.is_set():
                 stage1_result, stage1_evidence, stage1_findings = self._run_stage1()
@@ -249,6 +265,26 @@ class ScanOrchestrator:
 
     def _is_stage_enabled(self, stage: str) -> bool:
         return stage in self._config.enabled_stages
+
+    # ── Stage 0: model fingerprinting ────────────────────────────────────
+
+    def _run_stage0(self) -> FingerprintResult:
+        """Run Stage 0 model fingerprinting.
+
+        Currently returns a stub result.  Probe logic and classification
+        will be implemented in Phase 4b–4c — see
+        ``docs/FINGERPRINTING_DESIGN.md``.
+        """
+        if self._config.mode == "dry":
+            LOGGER.info("[stage0] fingerprinting skipped (dry mode)")
+            return FingerprintResult(status="skipped")
+
+        LOGGER.info(
+            "[stage0] fingerprinting not yet implemented — returning placeholder "
+            "(budget=%d)",
+            self._config.fingerprint_budget,
+        )
+        return FingerprintResult(status="skipped")
 
     # ── Statefulness probes ────────────────────────────────────────────────
     _STATE_PROBES: list[tuple[str, str, list[str]]] = [
@@ -2020,6 +2056,16 @@ class ScanOrchestrator:
                 "all tested parameters do not appear to be prompt-injectable. "
                 "Try increasing '--intensity' to test more prompts per family"
             )
+
+        # ── Write fingerprint.json ────────────────────────────────────────
+        if self._fingerprint is not None:
+            import json as _json
+            fp_path = self._run_dir / "fingerprint.json"
+            fp_path.write_text(
+                _json.dumps(self._fingerprint.to_dict(), indent=2),
+                encoding="utf-8",
+            )
+            LOGGER.info("fingerprint written: %s", fp_path)
 
         # ── Write report files ────────────────────────────────────────────
         if self._config.report_formats:

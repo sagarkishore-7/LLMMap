@@ -257,3 +257,138 @@ def test_tap_default_params(tmp_path: Path) -> None:
     assert cfg["tap_depth"] == 3
     assert cfg["tap_width"] == 2
     assert cfg["tap_query_budget"] == 18
+
+
+def test_fingerprint_flag_accepted_in_dry_mode(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--fingerprint",
+        ]
+    )
+    assert rc == 0
+
+
+def test_fingerprint_flag_sets_stage0_in_config(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--fingerprint",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    cfg = metadata["config"]
+
+    assert "stage0_fingerprint" in cfg["enabled_stages"]
+    assert "stage1" in cfg["enabled_stages"]
+    assert cfg["fingerprint"] is True
+
+
+def test_no_fingerprint_by_default(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    cfg = metadata["config"]
+
+    assert "stage0_fingerprint" not in cfg["enabled_stages"]
+    assert cfg["fingerprint"] is False
+
+
+def test_fingerprint_only_excludes_stage1(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--fingerprint-only",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    cfg = metadata["config"]
+
+    assert cfg["enabled_stages"] == ["stage0_fingerprint"]
+    assert cfg["fingerprint_only"] is True
+
+
+def test_fingerprint_budget_custom(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--fingerprint",
+            "--fingerprint-budget", "10",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    cfg = metadata["config"]
+
+    assert cfg["fingerprint_budget"] == 10
+
+
+def test_fingerprint_produces_fingerprint_json(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--fingerprint",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    fp_path = run_dir / "fingerprint.json"
+    assert fp_path.exists()
+
+    fp = json.loads(fp_path.read_text(encoding="utf-8"))
+    assert fp["stage"] == "stage0_fingerprint"
+    assert fp["status"] == "skipped"
+    assert fp["top_family"] == "unknown"
+
+
+def test_fingerprint_in_json_report(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--fingerprint",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    report = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+
+    assert "fingerprint" in report
+    assert report["fingerprint"]["status"] == "skipped"
+    assert report["fingerprint"]["top_family"] == "unknown"

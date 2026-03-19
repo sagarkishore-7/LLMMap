@@ -17,7 +17,11 @@ from llmmap.core.models import Finding, ScanReport
 
 def write_json_report(path: Path, report: ScanReport) -> None:
     """Serialize the full scan report to JSON."""
-    path.write_text(json.dumps(asdict(report), indent=2), encoding="utf-8")
+    data = asdict(report)
+    # fingerprint is already a plain dict (or None) — asdict wraps it
+    # in an extra layer; use the original value instead.
+    data["fingerprint"] = report.fingerprint
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +77,33 @@ def write_markdown_report(path: Path, report: ScanReport) -> None:
             )
         )
         lines.append(f"| Severity Breakdown | {breakdown} |")
+
+    # Model fingerprint
+    if report.fingerprint:
+        fp = report.fingerprint
+        lines.extend(["", "## Model Fingerprint", ""])
+        lines.extend([
+            "| Property | Value |",
+            "|----------|-------|",
+            f"| Top family | {fp.get('top_family', 'unknown')} ({fp.get('top_family_confidence', 0):.0%} confidence) |",
+            f"| Probes sent | {fp.get('probe_count', 0)} |",
+            f"| Status | `{fp.get('status', 'skipped')}` |",
+        ])
+        guardrails = fp.get("guardrails")
+        if guardrails:
+            gflags = [
+                k.replace("refuses_", "").replace("_", " ")
+                for k in ("refuses_harmful_content", "refuses_personal_data",
+                           "refuses_system_prompt_disclosure", "refuses_role_override")
+                if guardrails.get(k)
+            ]
+            if gflags:
+                lines.append(f"| Guardrails | {', '.join(gflags)} |")
+            lines.append(f"| Refusal style | {guardrails.get('refusal_style', 'unknown')} |")
+        lines.extend([
+            "",
+            "> **Note:** Fingerprint results are probabilistic estimates based on behavioral probing.",
+        ])
 
     # Stage results
     lines.extend(["", "## Stage Results", ""])
@@ -250,6 +281,7 @@ def write_sarif_report(path: Path, report: ScanReport) -> None:
                         },
                     },
                 ],
+                **({"properties": {"fingerprint": report.fingerprint}} if report.fingerprint else {}),
             },
         ],
     }

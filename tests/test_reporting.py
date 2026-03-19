@@ -325,3 +325,102 @@ def test_write_reports_empty_formats(tmp_path: Path) -> None:
     written = write_reports(tmp_path, report, ())
 
     assert len(written) == 0
+
+
+# ---------------------------------------------------------------------------
+# Fingerprint in reports
+# ---------------------------------------------------------------------------
+
+_SAMPLE_FINGERPRINT = {
+    "stage": "stage0_fingerprint",
+    "status": "skipped",
+    "probe_count": 0,
+    "elapsed_ms": 0.0,
+    "top_family": "unknown",
+    "top_family_confidence": 0.0,
+    "family_estimates": [],
+    "guardrails": {
+        "refuses_harmful_content": False,
+        "refuses_personal_data": False,
+        "refuses_system_prompt_disclosure": False,
+        "refuses_role_override": False,
+        "refusal_style": "unknown",
+        "content_filter_detected": False,
+    },
+    "response_language": "en",
+    "avg_response_length": 0,
+    "follows_formatting_instructions": True,
+    "echoes_input_tokens": False,
+}
+
+
+def test_json_report_includes_fingerprint(tmp_path: Path) -> None:
+    report = _sample_report()
+    report.fingerprint = _SAMPLE_FINGERPRINT
+    out = tmp_path / "report.json"
+
+    write_json_report(out, report)
+
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert "fingerprint" in data
+    assert data["fingerprint"]["status"] == "skipped"
+    assert data["fingerprint"]["top_family"] == "unknown"
+
+
+def test_json_report_no_fingerprint_when_none(tmp_path: Path) -> None:
+    report = _sample_report()
+    assert report.fingerprint is None
+    out = tmp_path / "report.json"
+
+    write_json_report(out, report)
+
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert data["fingerprint"] is None
+
+
+def test_markdown_report_includes_fingerprint_section(tmp_path: Path) -> None:
+    report = _sample_report()
+    report.fingerprint = _SAMPLE_FINGERPRINT
+    out = tmp_path / "report.md"
+
+    write_markdown_report(out, report)
+
+    content = out.read_text(encoding="utf-8")
+    assert "## Model Fingerprint" in content
+    assert "unknown" in content
+    assert "probabilistic estimates" in content
+
+
+def test_markdown_report_no_fingerprint_section_when_none(tmp_path: Path) -> None:
+    report = _sample_report()
+    out = tmp_path / "report.md"
+
+    write_markdown_report(out, report)
+
+    content = out.read_text(encoding="utf-8")
+    assert "## Model Fingerprint" not in content
+
+
+def test_sarif_report_includes_fingerprint_properties(tmp_path: Path) -> None:
+    report = _sample_report()
+    report.fingerprint = _SAMPLE_FINGERPRINT
+    out = tmp_path / "report.sarif.json"
+
+    write_sarif_report(out, report)
+
+    data = json.loads(out.read_text(encoding="utf-8"))
+    run = data["runs"][0]
+    assert "properties" in run
+    assert "fingerprint" in run["properties"]
+    assert run["properties"]["fingerprint"]["status"] == "skipped"
+
+
+def test_sarif_report_no_fingerprint_properties_when_none(tmp_path: Path) -> None:
+    report = _sample_report()
+    out = tmp_path / "report.sarif.json"
+
+    write_sarif_report(out, report)
+
+    data = json.loads(out.read_text(encoding="utf-8"))
+    run = data["runs"][0]
+    assert "properties" not in run
