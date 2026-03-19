@@ -596,9 +596,17 @@ export default function PromptLabPage() {
               </div>
               <SandboxBadge />
             </div>
-            <span className="text-xs text-gray-600 hidden sm:block">
-              Built on LLMMap
-            </span>
+            <div className="flex items-center gap-4">
+              <a
+                href="/techniques"
+                className="text-xs text-gray-500 hover:text-emerald-400 transition hidden sm:block"
+              >
+                Technique Browser
+              </a>
+              <span className="text-xs text-gray-600 hidden sm:block">
+                Built on LLMMap
+              </span>
+            </div>
           </div>
         </header>
 
@@ -631,6 +639,13 @@ export default function PromptLabPage() {
                   >
                     <FlaskIcon className="w-4 h-4" />
                     Open the Lab
+                  </a>
+                  <a
+                    href="/techniques"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white/[0.04] hover:bg-white/[0.08] text-gray-300 border border-white/[0.08] hover:border-white/[0.15] rounded-lg text-sm font-medium transition-all"
+                  >
+                    <BookIcon className="w-4 h-4" />
+                    Browse Techniques
                   </a>
                   <span className="text-sm text-gray-500">
                     No API keys required
