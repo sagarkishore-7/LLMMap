@@ -14,7 +14,12 @@ from pathlib import Path
 from uuid import uuid4
 
 from llmmap.config import RuntimeConfig
-from llmmap.core.fingerprint import FingerprintResult
+from llmmap.core.fingerprint import (
+    FingerprintResult,
+    PROBE_CATALOG,
+    ProbeResult,
+    analyze_probes,
+)
 from llmmap.core.http_client import HttpClient
 from llmmap.core.injection_points import discover_injection_points
 from llmmap.core.models import (
@@ -271,20 +276,68 @@ class ScanOrchestrator:
     def _run_stage0(self) -> FingerprintResult:
         """Run Stage 0 model fingerprinting.
 
-        Currently returns a stub result.  Probe logic and classification
-        will be implemented in Phase 4b–4c — see
-        ``docs/FINGERPRINTING_DESIGN.md``.
+        Sends a small set of diagnostic probes to the target via the
+        same HTTP path used by statefulness checks and Stage 1.  Probes
+        are capped by ``fingerprint_budget``.  Analysis is conservative —
+        see ``docs/FINGERPRINTING_DESIGN.md`` for the full design.
         """
         if self._config.mode == "dry":
             LOGGER.info("[stage0] fingerprinting skipped (dry mode)")
             return FingerprintResult(status="skipped")
 
-        LOGGER.info(
-            "[stage0] fingerprinting not yet implemented — returning placeholder "
-            "(budget=%d)",
-            self._config.fingerprint_budget,
+        # Discover injection points for probe delivery
+        points = discover_injection_points(
+            request=self._request,
+            marker=self._config.marker,
+            injection_points=self._config.injection_points,
+            param_filter=self._config.param_filter,
         )
-        return FingerprintResult(status="skipped")
+        points = _filter_injection_points(points, self._config.param_filter)
+        if not points:
+            LOGGER.warning("[stage0] no injection points — cannot send fingerprint probes")
+            return FingerprintResult(status="skipped")
+
+        point = points[0]
+        budget = self._config.fingerprint_budget
+        probes_to_send = PROBE_CATALOG[:budget]
+
+        LOGGER.info(
+            "[stage0] sending %d fingerprint probes (budget=%d)",
+            len(probes_to_send), budget,
+        )
+
+        results: list[ProbeResult] = []
+        for probe_def in probes_to_send:
+            if self._abort_event.is_set():
+                break
+
+            req = apply_prompt(
+                request=self._request,
+                point=point,
+                prompt=probe_def.prompt,
+                marker=self._config.marker,
+            )
+            resp = self._client.execute(req, use_cache=False)
+
+            results.append(ProbeResult(
+                probe_id=probe_def.probe_id,
+                category=probe_def.category,
+                prompt=probe_def.prompt,
+                response=resp.body or "",
+                status_code=resp.status_code,
+                elapsed_ms=resp.elapsed_ms,
+                error=resp.error,
+            ))
+
+        fp = analyze_probes(results)
+        LOGGER.info(
+            "[stage0] fingerprint: top_family=%s (%.0f%%), %d probes, %.1fs",
+            fp.top_family,
+            fp.top_family_confidence * 100,
+            fp.probe_count,
+            fp.elapsed_ms / 1000,
+        )
+        return fp
 
     # ── Statefulness probes ────────────────────────────────────────────────
     _STATE_PROBES: list[tuple[str, str, list[str]]] = [
