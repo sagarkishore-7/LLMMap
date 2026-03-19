@@ -5,6 +5,7 @@ Endpoints:
     GET  /api/scenarios                 -- List available scenarios
     GET  /api/scenarios/{id}            -- Get scenario details
     GET  /api/scenarios/{id}/techniques -- List techniques for a scenario
+    GET  /api/techniques                -- List all techniques in the catalog
     POST /api/simulate                  -- Run a simulation
 
 Deployment:
@@ -25,7 +26,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from promptlab.engine.simulator import list_techniques_for_scenario, run_simulation
+from promptlab.engine.simulator import list_all_techniques, list_techniques_for_scenario, run_simulation
 from promptlab.scenarios.registry import get_scenario, list_scenarios
 
 LOGGER = logging.getLogger(__name__)
@@ -133,6 +134,18 @@ def get_techniques(scenario_id: str) -> list[dict[str, Any]]:
     if scenario is None:
         raise HTTPException(status_code=404, detail=f"Scenario '{scenario_id}' not found")
     return list_techniques_for_scenario(scenario_id)
+
+
+@app.get("/api/techniques")
+def get_all_techniques(family: str | None = None) -> list[dict[str, Any]]:
+    """Return the full technique catalog from the LLMMap prompt packs.
+
+    Optional query parameter ``family`` filters by attack family.
+    """
+    techniques = list_all_techniques()
+    if family:
+        techniques = [t for t in techniques if t["family"] == family]
+    return techniques
 
 
 @app.post("/api/simulate", response_model=SimulateResponse)

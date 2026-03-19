@@ -174,6 +174,56 @@ def test_simulate_memory_bot_vulnerable() -> None:
     assert data["target_system_prompt"]
 
 
+# ---------------------------------------------------------------------------
+# /api/techniques endpoint
+# ---------------------------------------------------------------------------
+
+
+def test_get_all_techniques() -> None:
+    response = client.get("/api/techniques")
+    assert response.status_code == 200
+    techniques = response.json()
+    assert len(techniques) == 227
+    assert all("technique_id" in t for t in techniques)
+    assert all("family" in t for t in techniques)
+    assert all("tags" in t for t in techniques)
+    assert all("has_explanation" in t for t in techniques)
+    assert all("scenarios" in t for t in techniques)
+
+
+def test_get_techniques_filter_by_family() -> None:
+    response = client.get("/api/techniques?family=instruction_manipulation")
+    assert response.status_code == 200
+    techniques = response.json()
+    assert len(techniques) > 0
+    assert all(t["family"] == "instruction_manipulation" for t in techniques)
+
+
+def test_get_techniques_filter_unknown_family() -> None:
+    response = client.get("/api/techniques?family=nonexistent_family")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_techniques_include_scenario_mapping() -> None:
+    response = client.get("/api/techniques?family=instruction_manipulation")
+    assert response.status_code == 200
+    techniques = response.json()
+    # instruction_manipulation is used by support_bot
+    for t in techniques:
+        assert "support_bot" in t["scenarios"]
+
+
+def test_techniques_has_explanation_flag() -> None:
+    response = client.get("/api/techniques")
+    assert response.status_code == 200
+    techniques = response.json()
+    explained = [t for t in techniques if t["has_explanation"]]
+    unexplained = [t for t in techniques if not t["has_explanation"]]
+    assert len(explained) > 0
+    assert len(unexplained) > 0
+
+
 def test_simulate_memory_bot_defended() -> None:
     response = client.post("/api/simulate", json={
         "scenario_id": "memory_bot",

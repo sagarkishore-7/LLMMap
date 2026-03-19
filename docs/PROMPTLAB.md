@@ -82,7 +82,18 @@ Navigate to [http://localhost:3000](http://localhost:3000).
 | GET | `/api/scenarios` | List all scenarios |
 | GET | `/api/scenarios/{id}` | Get scenario details |
 | GET | `/api/scenarios/{id}/techniques` | List techniques for a scenario |
+| GET | `/api/techniques` | List all 227 techniques in the catalog |
+| GET | `/api/techniques?family={name}` | Filter techniques by attack family |
 | POST | `/api/simulate` | Run a simulation |
+
+### GET /api/techniques
+
+Returns the full technique catalog from the LLMMap prompt packs. Each entry includes:
+- `technique_id`, `family`, `name`, `tags`
+- `has_explanation` — whether a curated PromptLab explanation exists
+- `scenarios` — which PromptLab scenarios use this technique's family
+
+Optional query parameter `family` filters by attack family name.
 
 ### POST /api/simulate
 

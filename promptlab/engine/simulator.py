@@ -158,6 +158,37 @@ def _judge_response(
 # Public API
 # ---------------------------------------------------------------------------
 
+def list_all_techniques() -> list[dict]:
+    """Return all techniques from the prompt packs with metadata."""
+    from llmmap.prompts.loader import load_prompts_from_dir
+
+    try:
+        all_prompts = load_prompts_from_dir(_PROMPT_PACKS_DIR)
+    except (OSError, ValueError) as exc:
+        LOGGER.warning("could not load prompt packs: %s", exc)
+        return []
+
+    # Build family → scenario mapping from the registry
+    from promptlab.scenarios.registry import SCENARIOS
+    family_scenarios: dict[str, list[str]] = {}
+    for s in SCENARIOS.values():
+        for fam in s.attack_families:
+            family_scenarios.setdefault(fam, []).append(s.scenario_id)
+
+    techniques = []
+    for p in all_prompts:
+        explanation = get_technique_explanation(p.prompt_id)
+        techniques.append({
+            "technique_id": p.prompt_id,
+            "family": p.family,
+            "name": p.technique.replace("_", " ").title(),
+            "tags": list(p.tags),
+            "has_explanation": p.prompt_id in TECHNIQUE_EXPLANATIONS,
+            "scenarios": family_scenarios.get(p.family, []),
+        })
+    return techniques
+
+
 def list_techniques_for_scenario(scenario_id: str) -> list[dict]:
     """Return available techniques for a scenario, with metadata."""
     scenario = get_scenario(scenario_id)
