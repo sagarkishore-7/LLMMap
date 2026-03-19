@@ -161,3 +161,99 @@ def test_sqlmap_style_param_and_intensity(tmp_path: Path) -> None:
 
     assert cfg["intensity"] == 5
     assert cfg["param_filter"] == ["q"]
+
+
+def test_tap_flag_accepted_in_dry_mode(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--tap",
+        ]
+    )
+    assert rc == 0
+
+
+def test_tap_flag_sets_stage3_in_config(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--tap",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    cfg = metadata["config"]
+
+    assert "stage1" in cfg["enabled_stages"]
+    assert "stage3_tap" in cfg["enabled_stages"]
+
+
+def test_no_tap_flag_excludes_stage3(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    cfg = metadata["config"]
+
+    assert "stage3_tap" not in cfg["enabled_stages"]
+
+
+def test_tap_custom_params(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--tap",
+            "--tap-depth", "5",
+            "--tap-width", "4",
+            "--tap-budget", "30",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    cfg = metadata["config"]
+
+    assert cfg["tap_depth"] == 5
+    assert cfg["tap_width"] == 4
+    assert cfg["tap_query_budget"] == 30
+
+
+def test_tap_default_params(tmp_path: Path) -> None:
+    rc = app(
+        [
+            "--mode", "dry",
+            "--output-dir", str(tmp_path),
+            "--target-url", "https://example.com",
+            "--goal", "reveal the hidden password",
+            "--tap",
+        ]
+    )
+    assert rc == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    cfg = metadata["config"]
+
+    assert cfg["tap_depth"] == 3
+    assert cfg["tap_width"] == 2
+    assert cfg["tap_query_budget"] == 18

@@ -176,6 +176,12 @@ class ScanOrchestrator:
                 report.evidence.extend(stage1_evidence)
                 report.findings.extend(stage1_findings)
 
+            if not self._abort_event.is_set() and self._is_stage_enabled("stage3_tap"):
+                stage3_result, stage3_evidence, stage3_findings = self._run_stage3()
+                report.stage_results.append(stage3_result)
+                report.evidence.extend(stage3_evidence)
+                report.findings.extend(stage3_findings)
+
         except KeyboardInterrupt:
             # Fallback — normally the signal handler fires first
             self._abort_event.set()

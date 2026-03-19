@@ -168,6 +168,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="scan mode (default: live)",
     )
     scan_group.add_argument("--threads", type=int, default=1, help="concurrent HTTP requests")
+    scan_group.add_argument(
+        "--tap",
+        action="store_true",
+        help="enable TAP (Tree of Attacks with Pruning) iterative prompt refinement",
+    )
+    scan_group.add_argument(
+        "--tap-depth", type=int, default=None,
+        help="TAP search tree depth (default: 3)",
+    )
+    scan_group.add_argument(
+        "--tap-width", type=int, default=None,
+        help="TAP frontier width per depth level (default: 2)",
+    )
+    scan_group.add_argument(
+        "--tap-budget", type=int, default=None,
+        help="max HTTP queries for TAP stage (default: 18)",
+    )
 
     # ── Request ───────────────────────────────────────────────────────
     request_group = parser.add_argument_group("Request")
@@ -376,7 +393,9 @@ def app(argv: Sequence[str] | None = None) -> int:
     print_banner()
     print_start_marker()
 
-    stages = ("stage1",)
+    stages: tuple[str, ...] = ("stage1",)
+    if args.tap:
+        stages = ("stage1", "stage3_tap")
     if args.intensity < 1 or args.intensity > 5:
         LOGGER.error("--intensity must be between 1 and 5")
         return 2
@@ -499,7 +518,11 @@ def app(argv: Sequence[str] | None = None) -> int:
         canary_listener_host="127.0.0.1",
         canary_listener_port=8787,
         threads=args.threads,
-        # TAP (stage 3) args omitted — dataclass defaults apply
+        # TAP (stage 3)
+        tap_goal=args.goal,
+        tap_depth=args.tap_depth if args.tap_depth is not None else 3,
+        tap_width=args.tap_width if args.tap_width is not None else 2,
+        tap_query_budget=args.tap_budget if args.tap_budget is not None else 18,
         semantic_use_provider=False,
         operator_id="unknown",
         retention_days=0,
